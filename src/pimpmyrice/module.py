@@ -223,6 +223,10 @@ class ModuleManager:
                 else:
                     continue
 
+                if module.init:
+                    init_res = await module.execute_init()
+                    res += init_res
+
                 for action in module.run:
                     if isinstance(action, FileAction):
                         target = Path(parse_string_vars(action.target))
@@ -250,13 +254,8 @@ class ModuleManager:
                         os.symlink(action.template, link_path)
                         res.info(f'linked "{link_path}" to "{action.template}"')
 
-                if module.init:
-                    init_res = await module.execute_init()
-                    res += init_res
-
-                # TODO clean up files
                 if res.errors:
-                    res.error("failed cloning module")
+                    res.error(f'failed initializing module "{name}"')
                     continue
 
                 self.modules[name] = module
