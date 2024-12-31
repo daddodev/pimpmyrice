@@ -576,7 +576,7 @@ Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `export theme
         for module_name in modules_res.value:
             readme += f"- {module_name}\n"
 
-        with open(dump_dir / "README.md", "w") as f:
+        with open(dump_dir / "README.md", "w", encoding="utf-8") as f:
             f.write(readme)
 
         res.success(f'theme "{theme_name}" exported to {dump_dir}')

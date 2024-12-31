@@ -128,7 +128,7 @@ class ModuleManager:
                         executed_modules.add(task_res.name)
                         modules_state[task_res.name]["done"] = True
                     else:
-                        task_res.error(f"Result has no name")
+                        task_res.error("Result has no name")
 
                     module_res = task_res
                 else:
@@ -248,9 +248,8 @@ class ModuleManager:
                                 f'skipping linking "{link_path}" to "{action.template}", destination already exists'
                             )
                             continue
-                        else:
-                            link_path.parent.mkdir(exist_ok=True, parents=True)
 
+                        link_path.parent.mkdir(exist_ok=True, parents=True)
                         os.symlink(action.template, link_path)
                         res.info(f'linked "{link_path}" to "{action.template}"')
 

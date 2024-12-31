@@ -194,7 +194,7 @@ def is_process_running(name: str | None = None, pid: int | None = None) -> bool:
 
 def is_locked(lockfile: Path) -> tuple[bool, int]:
     if lockfile.exists():
-        with open(lockfile, "r") as f:
+        with open(lockfile, "r", encoding="utf-8") as f:
             file_pid = int(f.read())
 
         if is_process_running(pid=file_pid):
@@ -210,7 +210,7 @@ class Lock:
 
     def __enter__(self) -> None:
         pid = os.getpid()
-        with open(self.lockfile, "w") as f:
+        with open(self.lockfile, "w", encoding="utf-8") as f:
             f.write(str(pid))
 
     def __exit__(self, *_: Any) -> None:

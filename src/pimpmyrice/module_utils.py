@@ -137,11 +137,11 @@ class FileAction(BaseModel):
             if not target.parent.exists():
                 target.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(template, "r") as f:
+            with open(template, "r", encoding="utf-8") as f:
                 data = f.read()
             processed_data = utils.process_template(data, theme_dict)
 
-            with open(target, "w") as f:
+            with open(target, "w", encoding="utf-8") as f:
                 f.write(processed_data)
 
             res.debug(

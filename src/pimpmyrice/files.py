@@ -26,7 +26,7 @@ log = get_logger(__name__)
 
 
 def load_yaml(file: Path) -> dict[str, Any]:
-    with open(file) as f:
+    with open(file, encoding="utf-8") as f:
         return dict(yaml.load(f, Loader=yaml.Loader))
 
 
@@ -37,12 +37,12 @@ def save_yaml(file: Path, data: dict[str, Any]) -> None:
         schema_str = f'# yaml-language-server: $schema=../../.json_schemas/{file.name.split(".")[0]}.json\n\n'
         dump = schema_str + dump
 
-    with open(file, "w") as f:
+    with open(file, "w", encoding="utf-8") as f:
         f.write(dump)
 
 
 def load_json(file: Path) -> dict[str, Any]:
-    with open(file) as f:
+    with open(file, encoding="utf-8") as f:
 
         data = json.load(f)
         data.pop("$schema", None)
@@ -56,7 +56,7 @@ def save_json(file: Path, data: dict[str, Any]) -> None:
 
     dump = json.dumps(data, indent=4)
 
-    with open(file, "w") as f:
+    with open(file, "w", encoding="utf-8") as f:
         f.write(dump)
 
 

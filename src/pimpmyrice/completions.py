@@ -275,7 +275,7 @@ class CompletionGenerator:
             )
             return
         try:
-            with open(file_path, "w") as fd:
+            with open(file_path, "w", encoding="utf-8") as fd:
                 fd.write(completion_file_content)
         except IOError:
             print("Failed to write {file_path}".format(file_path=file_path))
@@ -513,7 +513,7 @@ def generate_shell_suggestions(tm: ThemeManager) -> None:
     content = add_zsh_suggestions(content, "IMAGE", [])
 
     try:
-        with open(file_path, "w") as fd:
+        with open(file_path, "w", encoding="utf-8") as fd:
             fd.write(content)
     except IOError:
         log.debug("Failed to write {file_path}".format(file_path=file_path))
