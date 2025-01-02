@@ -8,13 +8,7 @@ from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
-    ItemsView,
-    KeysView,
-    Literal,
     Tuple,
-    TypedDict,
-    TypeVar,
-    ValuesView,
 )
 
 from pydantic import BaseModel, Field, computed_field, validator
@@ -22,9 +16,7 @@ from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
 from pimpmyrice.colors import Color, LinkPalette, Palette, exp_gen_palette
-from pimpmyrice.config import JSON_SCHEMA_DIR
 from pimpmyrice.logger import get_logger
-from pimpmyrice.module_utils import FileAction, Module
 from pimpmyrice.utils import AttrDict, DictOrAttrDict, Result, get_thumbnail
 
 if TYPE_CHECKING:

@@ -169,7 +169,6 @@ class CommandParams:
 class DocoptCompletionException(Exception):
     """Custom exception for docopt completion errors."""
 
-    pass
 
 
 def build_command_tree(pattern: Any, cmd_params: "CommandParams") -> "CommandParams":

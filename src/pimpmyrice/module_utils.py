@@ -7,18 +7,14 @@ import shlex
 import shutil
 import subprocess
 import sys
-from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from types import ModuleType
 from typing import TYPE_CHECKING, Any, Literal, Union
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator, validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
-from typing_extensions import Annotated
 
 from pimpmyrice import files, utils
 from pimpmyrice.config import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, Os

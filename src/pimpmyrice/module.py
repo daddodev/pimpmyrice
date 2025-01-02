@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from pimpmyrice import module_utils as mutils
 from pimpmyrice.config import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
-from pimpmyrice.files import load_yaml, save_json, save_yaml
+from pimpmyrice.files import save_yaml
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import FileAction, Module
 from pimpmyrice.parsers import parse_module

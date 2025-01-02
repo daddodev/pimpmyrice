@@ -1,7 +1,6 @@
 import os
-from importlib.metadata import version
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pimpmyrice.config import (
     BASE_STYLE_FILE,

@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import os
-import re
 import subprocess
 from copy import deepcopy
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, create_model
 
-from pimpmyrice.config import CLIENT_OS, HOME_DIR, JSON_SCHEMA_DIR, Os
-from pimpmyrice.doc import __doc__ as cli_doc
+from pimpmyrice.config import CLIENT_OS, JSON_SCHEMA_DIR, Os
 from pimpmyrice.files import save_json
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import Module

@@ -5,7 +5,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Literal, Tuple
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
 from pydantic_core import PydanticCustomError
 from pydantic_extra_types.color import RGBA

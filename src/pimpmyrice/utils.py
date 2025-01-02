@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import MutableMapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path

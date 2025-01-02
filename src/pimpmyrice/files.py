@@ -13,7 +13,6 @@ from pimpmyrice.config import (
     LOG_FILE,
     MODULES_DIR,
     PALETTES_DIR,
-    PIMP_CONFIG_DIR,
     STYLES_DIR,
     TEMP_DIR,
     THEMES_DIR,

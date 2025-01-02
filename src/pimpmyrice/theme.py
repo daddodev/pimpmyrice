@@ -9,8 +9,6 @@ from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import (
     GlobalPalette,
-    LinkPalette,
-    Palette,
     exp_gen_palette,
     get_palettes,
 )
@@ -22,12 +20,11 @@ from pimpmyrice.files import (
     download_file,
     load_json,
     save_json,
-    save_yaml,
 )
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module import ModuleManager
 from pimpmyrice.theme_utils import Mode, Style, Theme, ThemeConfig
-from pimpmyrice.utils import AttrDict, Result, Timer
+from pimpmyrice.utils import Result, Timer
 
 log = get_logger(__name__)
 
