@@ -53,10 +53,10 @@ pytest
 
 Set up your editor with the following tools:
 
-- **pylsp**: For Python language server features like linting, autocompletion, and code navigation.
+- **pylint**: For Python code linting, checking for errors, enforcing coding standards, and providing suggestions for improvements.
 - **mypy**: For static type checking.
 - **black**: For automatic code formatting.
-- **pysort**: For sorting imports automatically.
+- **isort**: For sorting imports automatically.
 
 Most modern editors (e.g., **VSCode**, **Neovim**, etc.) support these tools through extensions or LSP plugins. Ensure your editor is configured to use the virtual environment's Python interpreter to have access to the installed tools.
 
