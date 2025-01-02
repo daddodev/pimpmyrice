@@ -27,19 +27,19 @@ jobs:
           python -m pip install ".[dev]"
 
       - name: Run Pylint
-        run: python -m pylint src/pimpmyrice --disable=C,R,W
+        run: python -m pylint src/pimpmyrice tests --disable=C,R,W
 
       - name: Run Mypy
-        run: python -m mypy src/pimpmyrice
+        run: python -m mypy src/pimpmyrice tests
 
       - name: Run Pytest
         run: python -m pytest --junitxml=reports/test-results.xml
 
       - name: Run Isort
-        run: python -m isort --check --diff src/pimpmyrice
+        run: python -m isort --check --diff src/pimpmyrice tests
 
       - name: Run Black
-        run: python -m black --check --diff src/pimpmyrice
+        run: python -m black --check --diff src/pimpmyrice tests
 
       - name: Upload test results
         if: always()
