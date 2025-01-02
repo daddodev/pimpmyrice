@@ -26,6 +26,9 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
 
+      - name: Run Pylint
+        run: python -m pylint src/pimpmyrice --disable=C,R,W
+
       - name: Run Mypy
         run: python -m mypy src/pimpmyrice
 

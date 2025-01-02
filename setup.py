@@ -39,6 +39,7 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
+            "pylint",
             "pytest",
             "pytest-asyncio",
             "mypy",
