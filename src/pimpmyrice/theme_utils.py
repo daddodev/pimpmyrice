@@ -76,7 +76,7 @@ class Theme(BaseModel):
     tags: set[str] = set()
 
     @validator("tags", pre=True)
-    def coerce_to_set(cls, value: Any) -> Any:
+    def coerce_to_set(cls, value: Any) -> Any:  # pylint: disable=no-self-argument
         if isinstance(value, list):
             return set(value)
         return value
