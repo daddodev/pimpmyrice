@@ -170,7 +170,6 @@ class DocoptCompletionException(Exception):
     """Custom exception for docopt completion errors."""
 
 
-
 def build_command_tree(pattern: Any, cmd_params: "CommandParams") -> "CommandParams":
     """
     Recursively fill in a command tree in cmd_params according to a docopt-parsed "pattern" object.

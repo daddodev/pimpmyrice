@@ -4,9 +4,7 @@ from typing import Any, Union
 from pimpmyrice import files
 from pimpmyrice.colors import GlobalPalette
 from pimpmyrice.logger import get_logger
-from pimpmyrice.module_utils import (
-    Module,
-)
+from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Style, Theme, Wallpaper
 from pimpmyrice.utils import Result
 

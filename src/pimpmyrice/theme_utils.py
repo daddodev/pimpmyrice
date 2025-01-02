@@ -5,11 +5,7 @@ import unicodedata
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Any, Tuple
 
 from pydantic import BaseModel, Field, computed_field, validator
 from pydantic.json_schema import SkipJsonSchema
