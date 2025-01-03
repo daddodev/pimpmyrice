@@ -310,7 +310,7 @@ ModuleCommand = Union[PythonAction]
 class Module(BaseModel):
     name: SkipJsonSchema[str] = Field(exclude=True)
     enabled: bool = True
-    os: list[Os] = [o for o in Os]
+    os: list[Os] = list(Os)
     init: list[ModuleInit] = []
     pre_run: list[ModulePreRun] = []
     run: list[ModuleRun] = []

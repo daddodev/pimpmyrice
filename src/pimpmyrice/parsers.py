@@ -80,7 +80,6 @@ def parse_module(module_path: Path) -> Result[Module]:
         res.value = module
 
     except Exception as e:
-        res.exception(e)
         res.error(f'failed loading module in "{module_path}": {e}')
     finally:
         return res

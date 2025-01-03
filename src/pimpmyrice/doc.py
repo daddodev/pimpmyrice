@@ -22,6 +22,7 @@ Usage:
     pimp toggle mode [options]
     pimp add tags THEMES... --tags=TAGS
     pimp remove tags [THEMES...] --tags=TAGS
+    pimp create module MODULE_NAME [options]
     pimp clone module MODULE_URL... [options]
     pimp delete module MODULE [options]
     pimp reinit module MODULE [options]

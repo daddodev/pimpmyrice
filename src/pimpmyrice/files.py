@@ -26,7 +26,14 @@ log = get_logger(__name__)
 
 def load_yaml(file: Path) -> dict[str, Any]:
     with open(file, encoding="utf-8") as f:
-        return dict(yaml.load(f, Loader=yaml.Loader))
+        data = yaml.load(f, Loader=yaml.Loader)
+        if data is None:
+            data = {}
+
+        if not isinstance(data, dict):
+            raise Exception(f"expected type dict, found {type(data).__name__}")
+
+        return data
 
 
 def save_yaml(file: Path, data: dict[str, Any]) -> None:
@@ -42,8 +49,10 @@ def save_yaml(file: Path, data: dict[str, Any]) -> None:
 
 def load_json(file: Path) -> dict[str, Any]:
     with open(file, encoding="utf-8") as f:
-
         data = json.load(f)
+        if data is None:
+            data = {}
+
         data.pop("$schema", None)
 
         return data  # type: ignore

@@ -11,7 +11,13 @@ from pimpmyrice import module_utils as mutils
 from pimpmyrice.config import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
 from pimpmyrice.files import save_yaml
 from pimpmyrice.logger import get_logger
-from pimpmyrice.module_utils import FileAction, Module
+from pimpmyrice.module_utils import (
+    FileAction,
+    IfRunningAction,
+    Module,
+    PythonAction,
+    ShellAction,
+)
 from pimpmyrice.parsers import parse_module
 from pimpmyrice.utils import AttrDict, Lock, Result, Timer, is_locked, parse_string_vars
 
@@ -194,6 +200,62 @@ class ModuleManager:
         init_res = await module.execute_init()
         res += init_res
 
+        res.ok = True
+        return res
+
+    async def create_module(self, module_name: str) -> Result:
+        # TODO add --bare; README, LICENSE
+
+        res = Result()
+
+        res.debug(f'creating module "{module_name}"')
+
+        if module_name in self.modules:
+            return res.error(f'module "{module_name}" already present')
+
+        module = Module(
+            name=module_name,
+            enabled=False,
+            run=[
+                IfRunningAction(module_name=module_name, program_name="someprogram"),
+                FileAction(
+                    module_name=module_name, target="{{config_dir}}/someprogram/config"
+                ),
+                ShellAction(module_name=module_name, command="somecommand"),
+                PythonAction(
+                    module_name=module_name,
+                    py_file_path="apply.py",
+                    function_name="main",
+                ),
+            ],
+        )
+        module_path = MODULES_DIR / module.name
+
+        module_path.mkdir()
+        (module_path / "templates").mkdir()
+        (module_path / "files").mkdir()
+
+        dump = module.model_dump(mode="json")
+        save_yaml(module_path / "module.yaml", dump)
+
+        with open(module_path / "apply.py", "w", encoding="utf-8") as f:
+            f.write(
+                """def main(theme_dict): # can also be async
+    print(theme_dict.wallpaper.path)
+    print(theme_dict["wallpaper"].path)
+    print(theme_dict)"""
+            )
+
+        try:
+            self.load_module(module_path)
+        except Exception as e:
+            res.exception(e)
+            return res.error(f'error loading module "{module_name}"')
+
+        init_res = await self.modules[module_name].execute_init()
+        res += init_res
+
+        res.success(f'module "{module_name}" created')
         res.ok = True
         return res
 

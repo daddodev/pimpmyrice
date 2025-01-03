@@ -41,8 +41,8 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> Result:
             options["name_includes"] = name_includes
         if tags:
             options["include_tags"] = tags
-        if t := args["--exclude-tags"]:
-            options["exclude_tags"] = set(t.split(","))
+        if exclude_tags:
+            options["exclude_tags"] = exclude_tags
         return await tm.set_random_theme(**options)
 
     elif args["refresh"]:
@@ -68,6 +68,9 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> Result:
     elif args["module"]:
         if args["clone"]:
             return await tm.mm.clone_module(args["MODULE_URL"])
+
+        elif args["create"]:
+            return await tm.mm.create_module(args["MODULE_NAME"])
 
         elif args["delete"]:
             return await tm.mm.delete_module(args["MODULE"])
