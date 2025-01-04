@@ -10,6 +10,9 @@ on:
 
 env:
   PACKAGE_NAME: "pimpmyrice"
+  AUTHOR_NAME: "daddodev"
+  AUTHOR_EMAIL: "daddodev@gmail.com"
+  LICENSE: "MIT"
 
 jobs:
   details:
@@ -107,6 +110,32 @@ jobs:
 
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+
+  aur_publish:
+    name: Update AUR package
+    runs-on: ubuntu-latest
+    needs: [setup_and_build, details]
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Generate PKGBUILD
+        run: |
+          cd packaging/aur
+          bash generate_pkgbuild.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }} ${{ env.LICENSE }}
+
+      - name: Publish AUR package
+        uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
+        with:
+          pkgname: ${{ env.PACKAGE_NAME }}
+          pkgbuild: ./PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: Update AUR package
+          ssh_keyscan_types: rsa,ecdsa,ed25519
 
 
   github_release:
