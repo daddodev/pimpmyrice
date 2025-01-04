@@ -21,7 +21,6 @@ log = get_logger(__name__)
 
 
 class ThemeManager:
-
     def __init__(self) -> None:
         timer = Timer()
         check_config_dirs()
@@ -504,7 +503,6 @@ class ThemeManager:
         exclude_modules: list[str] | None = None,
         print_theme_dict: bool = False,
     ) -> Result:
-
         res = Result()
 
         if theme_name not in self.themes:

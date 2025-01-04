@@ -56,7 +56,6 @@ class ModuleManager:
         exclude_modules: list[str] | None = None,
         out_dir: Path | None = None,
     ) -> Result[set[str]]:
-
         res: Result[set[str]] = Result()
 
         executed_modules: set[str] = set()
@@ -193,7 +192,7 @@ class ModuleManager:
     async def init_module(self, module_name: str) -> Result:
         res = Result()
 
-        if not module_name in self.modules:
+        if module_name not in self.modules:
             return res.error(f'module "{module_name}" not found')
 
         module = self.modules[module_name]

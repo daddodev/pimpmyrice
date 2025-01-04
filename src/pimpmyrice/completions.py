@@ -457,7 +457,6 @@ def add_zsh_suggestions(file_content: str, arg_name: str, values: list[str]) -> 
             replaced += line + "\n"
 
     elif arg_name == "IMAGE":
-
         replaced = file_content.replace(
             f"""
         myargs=('{arg_name.upper()}')
@@ -469,7 +468,6 @@ def add_zsh_suggestions(file_content: str, arg_name: str, values: list[str]) -> 
 """,
         )
     else:
-
         replaced = file_content.replace(
             f"""
         myargs=('{arg_name.upper()}')

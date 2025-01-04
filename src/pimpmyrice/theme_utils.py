@@ -181,7 +181,6 @@ def gen_theme_dict(
     palette_name: str | None = None,
     styles_names: list[str] | None = None,
 ) -> Result[AttrDict]:
-
     res: Result[AttrDict] = Result()
 
     theme = tm.themes[theme_name]

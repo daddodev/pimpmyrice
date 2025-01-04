@@ -39,14 +39,13 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
-            "pylint",
+            "ruff",
+            "mypy",
+            "isort",
             "pytest",
             "pytest-asyncio",
-            "mypy",
-            "black",
             "types-requests",
             "types-PyYAML",
-            "isort",
         ],
     },
 )

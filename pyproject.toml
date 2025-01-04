@@ -5,21 +5,15 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[tool.pylint.main]
-generated-members = ["cv2"]
+[tool.ruff.lint]
+select = []
+ignore = [
+    "E741"
+]
 
-[tool.pylint.'MESSAGES CONTROL']
-disable = '''
-        missing-module-docstring,
-        missing-class-docstring,
-        missing-function-docstring,
-        broad-exception-caught,
-        broad-exception-raised,
-        logging-fstring-interpolation,
-        too-many-arguments,
-        too-many-positional-arguments,
-        import-outside-toplevel,
-        '''
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.pytest.ini_options]
 filterwarnings = "ignore::DeprecationWarning"
