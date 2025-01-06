@@ -3,7 +3,7 @@ from __future__ import annotations
 import colorsys
 from collections import Counter
 from pathlib import Path
-from typing import Any, Literal, Tuple
+from typing import TYPE_CHECKING, Any, Literal, Tuple
 
 from pydantic import BaseModel, Field
 from pydantic.json_schema import SkipJsonSchema
@@ -15,7 +15,12 @@ from pydantic_extra_types.color import ColorType, parse_str, parse_tuple
 from pimpmyrice import files
 from pimpmyrice.config import PALETTES_DIR
 from pimpmyrice.logger import get_logger
-from pimpmyrice.utils import Timer
+from pimpmyrice.module_utils import run_shell_command
+from pimpmyrice.utils import Result, Timer
+
+if TYPE_CHECKING:
+    from numpy import uint8
+    from numpy.typing import NDArray
 
 log = get_logger(__name__)
 
@@ -114,6 +119,9 @@ class Color(PydanticColor):
     def __str__(self) -> str:
         return self.hex
 
+    def __repr__(self) -> str:
+        return f"Color({self.hex})"
+
 
 class TermColors(BaseModel):
     color0: Color
@@ -184,48 +192,70 @@ def palette_display_string(colors: Any) -> str:
     return palette_string
 
 
-def exp_extract_colors(img: Path) -> list[tuple[tuple[int, float, float], int]]:
-    import cv2
-    from sklearn.cluster import KMeans
+def kmeans(
+    pixels: NDArray[uint8],
+    num_clusters: int = 6,
+    max_iter: int = 100,
+    tol: float = 1e-4,
+) -> list[tuple[tuple[int, int, int], int]]:
+    import numpy as np
+    from PIL import Image
 
-    def preprocess(raw: Any) -> Any:
-        image = cv2.resize(raw, (600, 600), interpolation=cv2.INTER_AREA)
-        image = image.reshape(image.shape[0] * image.shape[1], 3)
-        return image
+    np.random.seed(42)
+    indices = np.random.choice(len(pixels), num_clusters, replace=False)
+    cluster_centers = pixels[indices]
 
-    def analyze(img: Any) -> list[tuple[tuple[int, float, float], int]]:
-        clf = KMeans(n_clusters=5, random_state=0, n_init="auto")
-        color_labels = clf.fit_predict(img)
-        center_colors = clf.cluster_centers_
-        counts = Counter(color_labels)
-        ordered_colors = [center_colors[i] for i in counts.keys()]
+    for iteration in range(max_iter):
+        distances = np.linalg.norm(pixels[:, np.newaxis] - cluster_centers, axis=2)
+        labels = np.argmin(distances, axis=1)
 
-        color_objects: list[tuple[Any, int]] = []
-        for i, count in counts.items():
-            b, g, r = ordered_colors[i]
-            c = tuple(
-                Color(
-                    (
-                        int(r),
-                        int(g),
-                        int(b),
-                    )
-                ).hsv,
-            )
+        new_cluster_centers: Any = []
+        cluster_sizes = []
 
-            color_objects.append((c, count // 100))
+        for k in range(num_clusters):
+            cluster_pixels = pixels[labels == k]
+            if len(cluster_pixels) == 0:
+                new_center = pixels[np.random.choice(len(pixels))]
+            else:
+                new_center = cluster_pixels.mean(axis=0)
+            new_cluster_centers.append(new_center)
+            cluster_sizes.append(len(cluster_pixels))
 
-        color_objects.sort(key=lambda x: x[1], reverse=True)
+        new_cluster_centers = np.array(new_cluster_centers)
 
-        return color_objects
+        if np.linalg.norm(new_cluster_centers - cluster_centers) < tol:
+            break
+        cluster_centers = new_cluster_centers
 
-    image = cv2.imread(str(img))
-    # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    sorted_clusters = sorted(
+        zip(cluster_centers, cluster_sizes), key=lambda x: x[1], reverse=True
+    )
 
-    modified_image = preprocess(image)
-    colors = analyze(modified_image)
+    sorted_cluster_centers = [
+        (tuple(center.astype(int)), size) for center, size in sorted_clusters
+    ]
 
-    return colors
+    return sorted_cluster_centers
+
+
+def extract_colors(
+    image_path: Path, num_colors: int = 6, resize_factor: float = 0.2
+) -> list[tuple[Color, int]]:
+    import numpy as np
+    from PIL import Image
+
+    img = Image.open(image_path).convert("RGB")
+    width, height = img.size
+    img = img.resize((int(width * resize_factor), int(height * resize_factor)))
+
+    img_array: NDArray[np.uint8] = np.array(img)
+    pixels: NDArray[np.uint8] = img_array.reshape(-1, 3)
+
+    sorted_colors_with_freq = kmeans(pixels, num_clusters=num_colors)
+
+    result = [(Color(color), count // 100) for color, count in sorted_colors_with_freq]
+
+    return result
 
 
 async def exp_gen_palette(img: Path, light: bool = False) -> Palette:
@@ -258,7 +288,8 @@ async def exp_gen_palette(img: Path, light: bool = False) -> Palette:
 
     timer = Timer()
 
-    extracted_hsv_colors = exp_extract_colors(img)
+    extracted_colors = extract_colors(img)
+    extracted_hsv_colors = [(c.hsv, f) for c, f in extracted_colors]
 
     main_color = extracted_hsv_colors[0][0]
 
