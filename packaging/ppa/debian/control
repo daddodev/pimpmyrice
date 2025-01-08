@@ -1,0 +1,21 @@
+Source: pimpmyrice
+Section: unknown
+Priority: optional
+Maintainer: daddodev <daddodev@gmail.com>
+Build-Depends: debhelper-compat (= 13), dh-python, python3-all
+Standards-Version: 4.6.1
+Homepage: <insert the upstream URL, if relevant>
+Rules-Requires-Root: no
+#Vcs-Git: https://salsa.debian.org/debian/pimpmyrice.git
+#Vcs-Browser: https://salsa.debian.org/debian/pimpmyrice
+
+Package: pimpmyrice
+Architecture: any
+Multi-Arch: foreign
+Depends: ${python3:Depends}, ${misc:Depends},
+         python3-docopt, python3-jinja2,
+         python3-psutil, python3-requests,
+         python3-rich, python3-typing-extensions,
+         python3-pydantic, python3-yaml,
+         python3-pil, python3-numpy
+Description: The overkill theme manager
