@@ -480,17 +480,18 @@ async def clone_from_git(url: str) -> str:
         cmd = f'set GIT_TERMINAL_PROMPT=0 && git clone "{url}" {random}'
     else:
         cmd = f'GIT_TERMINAL_PROMPT=0 git clone "{url}" {random}'
-    res, err = await run_shell_command(cmd, cwd=TEMP_DIR)
+
+    process = subprocess.run(
+        cmd, cwd=TEMP_DIR, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    res = process.stdout.decode()
+    err = process.stderr.decode()
+
+    if process.returncode != 0:
+        raise Exception("Failed to clone repository: " + err)
 
     if res:
         log.debug(res)
-
-    if err:
-        for line in err.split("\n"):
-            if line and "Cloning into" not in line:
-                if "terminal prompts disabled" in line:
-                    raise Exception("repository not found")
-                raise Exception(err)
 
     shutil.move(TEMP_DIR / random, dest_dir)
 
