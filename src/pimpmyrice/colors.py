@@ -3,6 +3,7 @@ from __future__ import annotations
 import colorsys
 import re
 from collections import Counter
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Tuple
 
@@ -297,6 +298,7 @@ def kmeans(
     return sorted_cluster_centers
 
 
+@cache
 def extract_colors(
     image_path: Path, num_colors: int = 6, resize_factor: float = 0.2
 ) -> list[tuple[Color, int]]:

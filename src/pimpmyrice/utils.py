@@ -216,25 +216,20 @@ class Lock:
         self.lockfile.unlink()
 
 
-def get_thumbnail(image_path: Path, max_px: int = 1024) -> Path:
-    import cv2
+def get_thumbnail(image_path: Path, max_px: int = 512) -> Path:
+    from PIL import Image
 
-    thumb_path = (
-        image_path.parent / f".{image_path.stem}_thumb_{max_px}{image_path.suffix}"
-    )
+    thumb_path = image_path.parent / f".{image_path.stem}_{max_px}{image_path.suffix}"
 
     if thumb_path.is_file():
         return thumb_path
 
-    img = cv2.imread(str(image_path))
-    fx = max_px / img.shape[1]
-    fy = max_px / img.shape[0]
-    f = min(fx, fy)
-    size = (int(img.shape[1] * f), int(img.shape[0] * f))
-    resized = cv2.resize(img, size)
+    log.debug(f"generating thumbnail for {image_path}")
 
-    cv2.imwrite(str(thumb_path), resized)
+    with Image.open(image_path) as img:
+        img.thumbnail((max_px, max_px))
+        img.save(thumb_path)
 
-    log.debug(f'{max_px}x{max_px} thumbnail generated for "{image_path}"')
+    log.debug(f'thumbnail generated for "{image_path}"')
 
     return thumb_path
