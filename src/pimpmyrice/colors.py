@@ -348,7 +348,7 @@ async def exp_gen_palette(img: Path, light: bool = False) -> Palette:
     timer = Timer()
 
     extracted_colors = extract_colors(img)
-    extracted_hsv_colors = [(c.hsv, f) for c, f in extracted_colors]
+    extracted_hsv_colors = [(c.hsv(), f) for c, f in extracted_colors]
 
     main_color = extracted_hsv_colors[0][0]
 
@@ -518,7 +518,8 @@ async def exp_gen_palette(img: Path, light: bool = False) -> Palette:
             hue -= 360
 
         palette["term"][f"color{i}"] = apply_rule(
-            (hue, most_saturated[1], most_saturated[2]), rules["term"]
+            (hue, most_saturated[1], most_saturated[2]),
+            rules["term"],
         )
 
     for i in range(9, 15):
