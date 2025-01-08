@@ -18,11 +18,11 @@ depends=(
     "python-rich"
     "python-jinja"
     "python-pyyaml"
-    "python-scikit-learn"
-    "python-opencv"
-    "python-typing_extensions"
+    "python-numpy"
+    "python-pillow"
     "python-pydantic"
     "python-pydantic-extra-types"
+    "python-typing_extensions"
 )
 makedepends=(
    "python-build"
