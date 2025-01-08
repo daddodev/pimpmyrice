@@ -4,11 +4,7 @@ _This project is currently in beta and may be subject to breaking changes._
 
 ### The overkill rice manager
 
-I heard you like ricing, so I made a ricer for your rices.
-
 [📄 Documentation](https://pimpmyrice.vercel.app/docs) ║ [📦 Starter Modules](https://pimpmyrice.vercel.app/modules) ║ [💬 Discord](https://discord.gg/TDrSB2wk6c)
-
-#### See it in action:
 
 [![showcase_video](video_thumbnail.png)](https://www.youtube.com/watch?v=Z0MnaKWo25U)
 
@@ -48,13 +44,21 @@ _*WIP_
 
 ### 📥 Install
 
-#### Arch Linux
+#### Arch
 
 ```bash
 yay -S pimpmyrice
 # or
 yay -S pimpmyrice-git
 ```
+
+<!-- #### Ubuntu -->
+<!---->
+<!-- ```bash -->
+<!-- sudo apt add-repository ppa:daddodev/pimpmyrice -->
+<!-- sudo apt update -->
+<!-- sudo apt install pimpmyrice -->
+<!-- ``` -->
 
 #### Other distros / Windows / MacOS
 
