@@ -21,7 +21,6 @@ depends=(
     "python-numpy"
     "python-pillow"
     "python-pydantic"
-    "python-pydantic-extra-types"
     "python-typing_extensions"
 )
 makedepends=(

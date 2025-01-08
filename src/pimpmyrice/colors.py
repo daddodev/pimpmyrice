@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import colorsys
+import re
 from collections import Counter
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Literal, Tuple
 
-from pydantic import BaseModel, Field
-from pydantic.json_schema import SkipJsonSchema
-from pydantic_core import PydanticCustomError
-from pydantic_extra_types.color import RGBA
-from pydantic_extra_types.color import Color as PydanticColor
-from pydantic_extra_types.color import ColorType, parse_str, parse_tuple
+from pydantic import BaseModel, Field, GetJsonSchemaHandler
+from pydantic.json_schema import JsonSchemaValue, SkipJsonSchema
+from pydantic_core import CoreSchema, PydanticCustomError, core_schema
 
 from pimpmyrice import files
 from pimpmyrice.config import PALETTES_DIR
@@ -25,102 +23,163 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 
-class Color(PydanticColor):
-    hue: int = 180
-    saturation: int = 50
-    lightness: int = 50
+class Color:
+    _rgba: tuple[int, int, int, int]
+    _original: str | tuple[int, int, int] | tuple[int, int, int, int] | "Color"
 
-    def __init__(self, value: ColorType) -> None:
-        self._rgba: RGBA
-        self._original: ColorType
-        if isinstance(value, (tuple, list)):
-            self._rgba = parse_tuple(value)
-        elif isinstance(value, str):
-            self._rgba = parse_str(value)
-        elif isinstance(value, Color):
-            self._rgba = value._rgba
-            value = value._original
-        else:
-            raise PydanticCustomError(
-                "color_error",
-                "value is not a valid color: value must be a tuple, list or string",
-            )
-
+    def __init__(
+        self, value: str | tuple[int, int, int] | tuple[int, int, int, int] | "Color"
+    ) -> None:
+        self._rgba: tuple[int, int, int, int] = (0, 0, 0, 255)
         self._original = value
 
-        rgb = self.as_rgb_tuple()
-        h, l, s = colorsys.rgb_to_hls(*tuple(x / 255 for x in rgb))
+        if isinstance(value, (tuple, list)):
+            self._rgba = self._parse_tuple(value)
+        elif isinstance(value, str):
+            self._rgba = self._parse_str(value)
+        elif isinstance(value, Color):
+            self._rgba = value._rgba
+            self._original = value._original
+        else:
+            raise ValueError(
+                "value is not a valid color: value must be a tuple, list, or string"
+            )
 
-        self.hue, self.saturation, self.lightness = (
-            int(h * 360),
-            int(s * 100),
-            int(l * 100),
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        field_schema: dict[str, Any] = {}
+        field_schema.update(type="string", format="color")
+        return field_schema
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: Callable[[Any], CoreSchema]
+    ) -> core_schema.CoreSchema:
+        return core_schema.with_info_plain_validator_function(
+            cls._validate, serialization=core_schema.to_string_ser_schema()
         )
 
-    @property
-    def rgb(self) -> tuple[int, int, int]:
-        rgb = self.as_rgb_tuple(alpha=False)[:3]
-        return rgb
+    @classmethod
+    def _validate(cls, __input_value: Any, _: Any) -> Color:
+        return cls(__input_value)
+
+    @staticmethod
+    def _parse_tuple(
+        value: tuple[int, int, int] | tuple[int, int, int, int],
+    ) -> tuple[int, int, int, int]:
+        if len(value) == 3:
+            return tuple(value) + (255,)  # type: ignore
+        elif len(value) == 4:
+            return tuple(value)  # type: ignore
+        else:
+            raise ValueError("Invalid tuple length for RGBA value")
+
+    @staticmethod
+    def _parse_str(value: str) -> tuple[int, int, int, int]:
+        if value.startswith("#"):
+            return Color._parse_hex(value)
+        elif value.startswith("hsl("):
+            return Color._parse_hsl(value)
+        raise ValueError(f'Invalid color string format: "{value}"')
+
+    @staticmethod
+    def _parse_hex(value: str) -> tuple[int, int, int, int]:
+        value = value[1:]
+        if len(value) == 6:
+            return tuple(int(value[i : i + 2], 16) for i in range(0, 6, 2)) + (255,)  # type: ignore
+        elif len(value) == 8:
+            return tuple(int(value[i : i + 2], 16) for i in range(0, 8, 2))  # type: ignore
+        else:
+            raise ValueError("Invalid hex string format")
+
+    @staticmethod
+    def _parse_hsl(value: str) -> tuple[int, int, int, int]:
+        hsl_match = re.match(r"hsl\((\d+),\s*(\d+)%\s*,\s*(\d+)%\s*\)", value)
+        if not hsl_match:
+            raise ValueError("Invalid HSL string format")
+
+        hue = int(hsl_match.group(1))
+        saturation = int(hsl_match.group(2))
+        lightness = int(hsl_match.group(3))
+
+        r, g, b = colorsys.hls_to_rgb(hue / 360, lightness / 100, saturation / 100)
+        rgb = tuple(int(x * 255) for x in (r, g, b))
+
+        return rgb + (255,)  # type: ignore
 
     @property
-    def rgb_string(self) -> str:
-        rgb = self.as_rgb()
-        return rgb
+    def alpha(self) -> int:
+        return self.rgba[3]
+
+    def rgb(self, include_alpha: bool = False) -> tuple[int, ...]:
+        return self.rgba if include_alpha else self.rgba[:3]
+
+    def rgb_string(self, include_alpha: bool = False) -> str:
+        result = self.rgba if include_alpha else self.rgba[:3]
+        return f"rgb({','.join(map(str, result))})"
+
+    def hsl(self, include_alpha: bool = False) -> tuple[int, ...]:
+        rgb = self.rgba
+        h, l, s = colorsys.rgb_to_hls(*[x / 255 for x in rgb[:3]])
+        hsl = (int(h * 360), int(s * 100), int(l * 100))
+        return hsl + (rgb[3],) if include_alpha else hsl
+
+    def hsl_string(self, include_alpha: bool = False) -> str:
+        result = self.hsl(include_alpha)
+        return f"hsl({','.join(map(str, result))})"
+
+    def hex(self, include_alpha: bool = False) -> str:
+        hex_value = "".join(f"{hex(x)[2:]:0>2}" for x in self.rgba[:3])
+        if include_alpha:
+            hex_value += f"{hex(self.rgba[3])[2:]:0>2}"
+        return f"#{hex_value}"
+
+    def hsv(self, include_alpha: bool = False) -> tuple[int, ...]:
+        rgb = self.rgba
+        h, s, v = colorsys.rgb_to_hsv(*[x / 255 for x in rgb[:3]])
+        hsv = (int(h * 360), s, v)
+        return hsv + (rgb[3],) if include_alpha else hsv  # type: ignore
+
+    def hsv_string(self, include_alpha: bool = False) -> str:
+        result = self.hsv(include_alpha)
+        return f"hsv({','.join(map(str, result))})"
 
     @property
-    def hsl(self) -> tuple[int, int, int]:
-        return self.hue, self.saturation, self.lightness
+    def rgba(self) -> tuple[int, int, int, int]:
+        return self._rgba
 
     @property
-    def alt(self) -> Color:
-        h, s, v = colorsys.rgb_to_hsv(*[x / 255 for x in self.as_rgb_tuple()])
+    def nohash(self) -> str:
+        return self.hex()[1:]
+
+    @property
+    def alt(self) -> "Color":
+        h, s, v = colorsys.rgb_to_hsv(*[x / 255 for x in self._rgba[:3]])
         if v > 0.5:
             v -= 0.1
         else:
             v += 0.1
         r, g, b = colorsys.hsv_to_rgb(h, s, v)
         rgb = tuple(int(x * 255) for x in (r, g, b))
-        clr = Color(rgb)  # type:ignore
+        clr = Color(rgb)  # type: ignore
         return clr
 
     @property
-    def maxsat(self) -> Color:
-        h, *_ = self.as_hsl_tuple()
-        hsl = f"hsl({int(h*360)}, 100%, 50%)"
+    def maxsat(self) -> "Color":
+        hsl = f"hsl({self.hsl()[0]}, 100%, 50%)"
         clr = Color(hsl)
-
         return clr
-
-    @property
-    def hex(self) -> str:
-        rgb = tuple(f"{hex(int(x))[2:] :0>2}" for x in self.as_rgb_tuple())
-        hex_string = "#" + "".join(rgb)
-
-        return hex_string
-
-    @property
-    def nohash(self) -> str:
-        hex = self.hex
-        clr = hex[1:]
-        return clr
-
-    @property
-    def hsv(self) -> tuple[int, float, float]:
-        rgb = self.as_rgb_tuple()
-        h, s, v = colorsys.rgb_to_hsv(*[x / 255 for x in rgb])
-        clr = int(h * 360), s, v
-        return clr
-
-    # TODO hsl
-    # @property
-    # def hsl(self) -> tuple[int, float, float]:
-    #     return clr
 
     def __str__(self) -> str:
-        return self.hex
+        return self.hex()
 
     def __repr__(self) -> str:
-        return f"Color({self.hex})"
+        return f"Color({self.hex()})"
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, Color) and self.rgba == other.rgba
 
 
 class TermColors(BaseModel):

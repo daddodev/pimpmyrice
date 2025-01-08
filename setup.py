@@ -34,7 +34,6 @@ setuptools.setup(
         "numpy",
         "pillow",
         "pydantic",
-        "pydantic-extra-types",
         "typing_extensions",
     ],
     extras_require={
