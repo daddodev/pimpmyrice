@@ -11,14 +11,12 @@ os.environ["PIMP_TESTING"] = "True"
 from pimpmyrice.theme import ThemeManager
 
 
-# Set environment variables and prepare test environment
 @pytest.fixture(scope="session", autouse=True)
 def setup_environment() -> Any:
     files_dir = Path("./tests/files")
+    yield
     if files_dir.exists():
         shutil.rmtree(files_dir)
-    yield
-    shutil.rmtree(files_dir)
 
 
 @pytest.fixture

@@ -99,8 +99,7 @@ class ModuleManager:
 
             if len(runners) == 0:
                 res.error(
-                    "no modules to run!\n"
-                    f"See {REPOS_BASE_ADDR} for available modules"
+                    f"no modules to run!\nSee {REPOS_BASE_ADDR} for available modules"
                 )
                 return res
 
@@ -271,7 +270,7 @@ class ModuleManager:
                     name = await mutils.clone_from_git(source)
 
                 elif source.startswith("pimp://"):
-                    url = f'{REPOS_BASE_ADDR}/{source.removeprefix("pimp://")}'
+                    url = f"{REPOS_BASE_ADDR}/{source.removeprefix('pimp://')}"
                     name = await mutils.clone_from_git(url)
 
                 else:

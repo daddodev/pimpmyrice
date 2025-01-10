@@ -77,7 +77,7 @@ class Result(Generic[T]):
         exc_str = str(exception).strip()
 
         if message:
-            msg = f"{message}:\r\n{' '*(len(name)+2 if name else 0)}{exc_str}"
+            msg = f"{message}:\r\n{' ' * (len(name) + 2 if name else 0)}{exc_str}"
         else:
             msg = exc_str
 

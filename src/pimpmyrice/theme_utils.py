@@ -292,7 +292,7 @@ def valid_theme_name(name: str, themes: dict[str, Theme]) -> str:
     tries = 1
     n = name
     while n in themes:
-        n = f"{name}_{tries+1}"
+        n = f"{name}_{tries + 1}"
         tries += 1
     return n
 

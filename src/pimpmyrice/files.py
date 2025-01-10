@@ -40,7 +40,7 @@ def save_yaml(file: Path, data: dict[str, Any]) -> None:
     dump = yaml.dump(data, indent=4, default_flow_style=False)
 
     if file.name in ("module.yaml", "theme.yaml"):
-        schema_str = f'# yaml-language-server: $schema=../../.json_schemas/{file.name.split(".")[0]}.json\n\n'
+        schema_str = f"# yaml-language-server: $schema=../../.json_schemas/{file.name.split('.')[0]}.json\n\n"
         dump = schema_str + dump
 
     with open(file, "w", encoding="utf-8") as f:
@@ -60,7 +60,7 @@ def load_json(file: Path) -> dict[str, Any]:
 
 def save_json(file: Path, data: dict[str, Any]) -> None:
     if file.name in ("module.json", "theme.json") and file.parent != JSON_SCHEMA_DIR:
-        data["$schema"] = f'../../.json_schemas/{file.name.split(".")[0]}.json'
+        data["$schema"] = f"../../.json_schemas/{file.name.split('.')[0]}.json"
 
     dump = json.dumps(data, indent=4)
 
@@ -139,7 +139,7 @@ def download_file(url: str, destination: Path = TEMP_DIR) -> Result[Path]:
         tries = 1
         while save_path.exists():
             save_path = (
-                save_path.parent / f"{save_path.stem}_{tries+1}{save_path.suffix}"
+                save_path.parent / f"{save_path.stem}_{tries + 1}{save_path.suffix}"
             )
 
         with open(save_path, "wb") as file:

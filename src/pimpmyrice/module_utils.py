@@ -104,7 +104,7 @@ class FileAction(BaseModel):
     @classmethod
     def set_fields(cls, data: Any) -> Any:
         if "target" in data and "template" not in data:
-            template_path = f'{Path(data["target"]).name}.j2'
+            template_path = f"{Path(data['target']).name}.j2"
             data["template"] = template_path
         return data
 

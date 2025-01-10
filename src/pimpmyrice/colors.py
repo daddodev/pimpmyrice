@@ -525,7 +525,7 @@ async def exp_gen_palette(img: Path, light: bool = False) -> Palette:
         )
 
     for i in range(9, 15):
-        h, s, v = palette["term"][f"color{i-8}"]
+        h, s, v = palette["term"][f"color{i - 8}"]
 
         palette["term"][f"color{i}"] = apply_rule(
             (
