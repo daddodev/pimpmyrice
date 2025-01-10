@@ -8,9 +8,10 @@ import shutil
 import subprocess
 import sys
 from copy import deepcopy
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -65,13 +66,17 @@ class ShellAction(BaseModel):
                     f'command "{cmd}" started in background', self.module_name
                 )
 
-            out, err = await run_shell_command(cmd)
+            r = await run_shell_command(cmd)
 
-            if out:
-                res.debug(out, self.module_name)
-            if err:
+            if r.returncode != 0:
+                res.error(f'command "{cmd}" exited with code {r.returncode}:')
+                res.error("stdout:", r.out)
+                res.error("stderr:", r.err)
+                return res
+
+            if r.err:
                 res.warning(
-                    f'command "{cmd}" returned an error:\n{err}', self.module_name
+                    f'command "{cmd}" returned errors:\n{r.err}', self.module_name
                 )
 
             res.debug(
@@ -441,7 +446,14 @@ def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
     )
 
 
-async def run_shell_command(command: str, cwd: Path | None = None) -> tuple[str, str]:
+@dataclass
+class ShellResponse:
+    out: str
+    err: str
+    returncode: int
+
+
+async def run_shell_command(command: str, cwd: Path | None = None) -> ShellResponse:
     proc = await asyncio.create_subprocess_shell(
         command,
         stdout=asyncio.subprocess.PIPE,
@@ -449,7 +461,17 @@ async def run_shell_command(command: str, cwd: Path | None = None) -> tuple[str,
         cwd=cwd,
     )
     out, err = await proc.communicate()
-    return out.decode(), err.decode()
+
+    if proc.returncode is None:
+        raise Exception("returncode is None")
+
+    res = ShellResponse(
+        out=out.decode(),
+        err=err.decode(),
+        returncode=proc.returncode,
+    )
+
+    return res
 
 
 def load_module_conf(module_name: str) -> dict[str, Any]:
@@ -475,22 +497,24 @@ async def clone_from_git(url: str) -> str:
     dest_dir = MODULES_DIR / name
     if dest_dir.exists():
         raise Exception(f'module "{name}" already present')
+
     random = str(uuid4())
+
     if CLIENT_OS == Os.WINDOWS:
         cmd = f'set GIT_TERMINAL_PROMPT=0 && git clone "{url}" {random}'
     else:
         cmd = f'GIT_TERMINAL_PROMPT=0 git clone "{url}" {random}'
-    res, err = await run_shell_command(cmd, cwd=TEMP_DIR)
 
-    if res:
-        log.debug(res)
+    r = await run_shell_command(cmd, cwd=TEMP_DIR)
+    if r.out:
+        log.debug(f'git clone "{url}" stdout:\n{r.out}')
+    if r.err:
+        log.debug(f'git clone "{url}" stderr:\n{r.err}')
 
-    if err:
-        for line in err.split("\n"):
-            if line and "Cloning into" not in line:
-                if "terminal prompts disabled" in line:
-                    raise Exception("repository not found")
-                raise Exception(err)
+    if r.returncode != 0:
+        raise Exception(
+            f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{url}" not found'
+        )
 
     shutil.move(TEMP_DIR / random, dest_dir)
 
