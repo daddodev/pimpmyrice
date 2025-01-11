@@ -2,20 +2,18 @@ from __future__ import annotations
 
 import colorsys
 import re
-from collections import Counter
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Tuple
 
 from pydantic import BaseModel, Field, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue, SkipJsonSchema
-from pydantic_core import CoreSchema, PydanticCustomError, core_schema
+from pydantic_core import CoreSchema, core_schema
 
 from pimpmyrice import files
 from pimpmyrice.config import PALETTES_DIR
 from pimpmyrice.logger import get_logger
-from pimpmyrice.module_utils import run_shell_command
-from pimpmyrice.utils import Result, Timer
+from pimpmyrice.utils import Timer
 
 if TYPE_CHECKING:
     from numpy import uint8
@@ -259,7 +257,6 @@ def kmeans(
     tol: float = 1e-4,
 ) -> list[tuple[tuple[int, int, int], int]]:
     import numpy as np
-    from PIL import Image
 
     np.random.seed(42)
     indices = np.random.choice(len(pixels), num_clusters, replace=False)

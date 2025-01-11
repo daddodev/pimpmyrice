@@ -11,7 +11,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Literal, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -213,7 +213,7 @@ class WaitForAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "wait_for")
     )
 
-    async def run(self, theme_dict: AttrDict, modules_state: dict[str, Any]) -> Result:
+    async def run(self, _: AttrDict, modules_state: dict[str, Any]) -> Result:
         res = Result()
 
         try:
@@ -243,7 +243,7 @@ class IfRunningAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "if_running")
     )
 
-    async def run(self, theme_dict: AttrDict) -> Result:
+    async def run(self, _: AttrDict) -> Result:
         res = Result()
 
         try:
@@ -435,6 +435,7 @@ def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
         subprocess.Popen(
             shlex.split(command),
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            cwd=cwd,
         )
         return
 
@@ -443,6 +444,7 @@ def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         preexec_fn=os.setpgrp,
+        cwd=cwd,
     )
 
 
