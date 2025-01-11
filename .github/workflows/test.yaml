@@ -1,4 +1,4 @@
-name: Run Tests
+name: Lint, Test and Check formatting
 
 on:
   push:
@@ -9,7 +9,8 @@ on:
       - main
 
 jobs:
-  test:
+  lint_test:
+    name: Run Ruff (lint & format), Mypy, Pytest and Isort
     runs-on: ubuntu-latest
 
     steps:
@@ -29,18 +30,17 @@ jobs:
       - name: Run Ruff (lint)
         run: python -m ruff check src/pimpmyrice tests
 
-      - name: Run Ruff (format)
-        run: python -m ruff format --check --diff src/pimpmyrice tests
-
-      - name: Run Isort
-        run: python -m isort --check --diff src/pimpmyrice tests
-
       - name: Run Mypy
         run: python -m mypy src/pimpmyrice tests
 
       - name: Run Pytest
         run: python -m pytest --junitxml=reports/test-results.xml
 
+      - name: Run Ruff (format)
+        run: python -m ruff format --check --diff src/pimpmyrice tests
+
+      - name: Run Isort
+        run: python -m isort --check --diff src/pimpmyrice tests
 
       - name: Upload test results
         if: always()
