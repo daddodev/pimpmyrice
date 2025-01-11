@@ -76,7 +76,7 @@ class ThemeManager:
         return get_palettes()
 
     def parse_theme(self, theme_path: Path) -> Theme:
-        theme = parsers.parse_theme(theme_path, self.styles, self.palettes)
+        theme = parsers.parse_theme(theme_path)
 
         return theme
 

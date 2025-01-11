@@ -2,16 +2,12 @@ from pathlib import Path
 from typing import Any, Union
 
 from pimpmyrice import files
-from pimpmyrice.colors import GlobalPalette
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import Module
-from pimpmyrice.theme_utils import Style, Theme, Wallpaper
+from pimpmyrice.theme_utils import Theme, Wallpaper
 from pimpmyrice.utils import Result
 
 log = get_logger(__name__)
-
-
-# TODO use pydantic
 
 
 def parse_wallpaper(
@@ -28,8 +24,6 @@ def parse_wallpaper(
 
 def parse_theme(
     path: Path,
-    global_styles: dict[str, Style],
-    global_palettes: dict[str, GlobalPalette],
 ) -> Theme:
     name = path.name
 
@@ -48,7 +42,6 @@ def parse_theme(
                     mode["wallpaper"] = parse_wallpaper(mode["wallpaper"], path)
 
     theme = Theme(**data, name=name, path=path)
-    # TODO global style
     return theme
 
 
