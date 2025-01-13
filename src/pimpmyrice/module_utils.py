@@ -146,7 +146,7 @@ class FileAction(BaseModel):
                 f.write(processed_data)
 
             res.debug(
-                f'generated "{target.name}"',
+                f'generated "{target}"',
                 self.module_name,
             )
             res.ok = True
