@@ -1,9 +1,67 @@
 [build-system]
-requires = [
-    "setuptools",
-    "wheel"
-]
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "pimpmyrice"
+version = "0.3.2"
+description = "The overkill rice manager"
+readme = {file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "daddodev", email = "daddodev@gmail.com"}
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent"
+]
+dependencies = [
+    "rich",
+    "docopt",
+    "pyyaml",
+    "jinja2",
+    "requests",
+    "psutil",
+    "numpy",
+    "pillow",
+    "pydantic",
+    "typing_extensions"
+]
+
+[project.urls]
+Homepage = "https://github.com/daddodev/pimpmyrice"
+"Bug Tracker" = "https://github.com/daddodev/pimpmyrice/issues"
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+    "isort",
+    "pytest",
+    "pytest-asyncio",
+    "types-requests",
+    "types-PyYAML"
+]
+
+[project.scripts]
+pimp = "pimpmyrice.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pimpmyrice = ["assets/*.json"]
+
+
+
+
+
+
+
+
+
 
 [tool.ruff]
 target-version = "py310"
