@@ -23,6 +23,9 @@ setuptools.setup(
     entry_points={"console_scripts": ["pimp=pimpmyrice.__main__:main"]},
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
+    package_data={
+        "pimpmyrice": ["assets/*.json"],
+    },
     python_requires=">=3.10",
     install_requires=[
         "rich",

@@ -1,11 +1,14 @@
 import json
 import mimetypes
+import os
 import shutil
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from pimpmyrice import assets
 from pimpmyrice.config import (
     BASE_STYLE_FILE,
     CONFIG_FILE,
@@ -17,7 +20,6 @@ from pimpmyrice.config import (
     TEMP_DIR,
     THEMES_DIR,
 )
-from pimpmyrice.keywords import default_base_style
 from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import Result
 
@@ -39,8 +41,9 @@ def load_yaml(file: Path) -> dict[str, Any]:
 def save_yaml(file: Path, data: dict[str, Any]) -> None:
     dump = yaml.dump(data, indent=4, default_flow_style=False)
 
-    if file.name in ("module.yaml", "theme.yaml"):
-        schema_str = f"# yaml-language-server: $schema=../../.json_schemas/{file.name.split('.')[0]}.json\n\n"
+    schema_file = JSON_SCHEMA_DIR / f"{file.stem}.json"
+    if schema_file.exists():
+        schema_str = f"# yaml-language-server: $schema={schema_file}\n\n"
         dump = schema_str + dump
 
     with open(file, "w", encoding="utf-8") as f:
@@ -50,6 +53,7 @@ def save_yaml(file: Path, data: dict[str, Any]) -> None:
 def load_json(file: Path) -> dict[str, Any]:
     with open(file, encoding="utf-8") as f:
         data = json.load(f)
+
         if data is None:
             data = {}
 
@@ -59,11 +63,11 @@ def load_json(file: Path) -> dict[str, Any]:
 
 
 def save_json(file: Path, data: dict[str, Any]) -> None:
-    if file.name in ("module.json", "theme.json") and file.parent != JSON_SCHEMA_DIR:
-        data["$schema"] = f"../../.json_schemas/{file.name.split('.')[0]}.json"
+    schema_file = JSON_SCHEMA_DIR / file.name
+    if schema_file.exists():
+        data["$schema"] = os.path.relpath(schema_file, file.parent)
 
     dump = json.dumps(data, indent=4)
-
     with open(file, "w", encoding="utf-8") as f:
         f.write(dump)
 
@@ -83,7 +87,7 @@ def import_image(image_path: Path, theme_dir: Path) -> Path:
     return dest
 
 
-def check_config_dirs() -> None:
+def create_config_dirs() -> None:
     for dir in [
         THEMES_DIR,
         STYLES_DIR,
@@ -95,12 +99,14 @@ def check_config_dirs() -> None:
         dir.mkdir(exist_ok=True, parents=True)
 
     if not BASE_STYLE_FILE.exists():
-        save_json(BASE_STYLE_FILE, default_base_style)
+        with resources.as_file(
+            resources.files(assets) / "default_base_style.json"
+        ) as source:
+            shutil.copy(source, BASE_STYLE_FILE)
+
     if not CONFIG_FILE.exists():
         config = {"theme": None, "mode": "dark"}
         save_json(CONFIG_FILE, config)
-    if not LOG_FILE.exists():
-        LOG_FILE.touch()
 
     # if not VENV_DIR.exists():
     #     create_venv()
