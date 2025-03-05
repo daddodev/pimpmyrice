@@ -36,13 +36,14 @@ Homepage = "https://github.com/daddodev/pimpmyrice"
 
 [project.optional-dependencies]
 dev = [
+    "python-lsp-server",
     "ruff",
     "mypy",
     "isort",
     "pytest",
     "pytest-asyncio",
     "types-requests",
-    "types-PyYAML"
+    "types-PyYAML",
 ]
 
 [project.scripts]
