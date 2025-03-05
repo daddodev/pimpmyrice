@@ -1,4 +1,4 @@
-name: release
+name: Build & Publish
 
 on:
   push:
@@ -10,12 +10,14 @@ on:
 
 env:
   PACKAGE_NAME: "pimpmyrice"
+  PACKAGE_DESCRIPTION: "The overkill theme manager"
   AUTHOR_NAME: "daddodev"
   AUTHOR_EMAIL: "daddodev@gmail.com"
   LICENSE: "MIT"
 
 jobs:
   details:
+    name: Extract tag and Details
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.release.outputs.new_version }}
@@ -42,8 +44,9 @@ jobs:
             exit 1
           fi
 
-  setup_and_build:
-    needs: [details]
+  python_build:
+    name: Build Python package wheel and source tarball
+    # needs: [details]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +62,7 @@ jobs:
         run: python -m build
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
@@ -67,7 +70,7 @@ jobs:
 
   pypi_publish:
     name: Upload release to PyPI
-    needs: [details, setup_and_build]
+    needs: [details, python_build]
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -97,7 +100,7 @@ jobs:
           fi
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
@@ -105,7 +108,7 @@ jobs:
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
-
+  # TODO build .pkg.tar.zst
   aur_publish:
     name: Update AUR package
     needs: [details]
@@ -117,7 +120,8 @@ jobs:
 
       - name: Fetch latest version from AUR
         run: |
-          latest_aur_version=$(curl -s https://aur.archlinux.org/rpc/?v=5&type=info&arg=${{ env.PACKAGE_NAME }} | jq -r '.results.Version // "0.0.0"')
+          latest_aur_version=$(curl -s https://aur.archlinux.org/rpc/v5/info?arg[]=${{ env.PACKAGE_NAME }} | jq -r '.results[0].Version')
+
           echo "Latest version on AUR: $latest_aur_version"
           echo "latest_aur_version=$latest_aur_version" >> $GITHUB_ENV
 
@@ -135,7 +139,7 @@ jobs:
       - name: Generate PKGBUILD
         run: |
           cd packaging/aur
-          bash generate_pkgbuild.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }} ${{ env.LICENSE }}
+          bash generate_pkgbuild.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }} ${{ env.LICENSE }} ${{ env.PACKAGE_DESCRIPTION }}
 
       - name: Publish AUR package
         uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
@@ -149,62 +153,157 @@ jobs:
           ssh_keyscan_types: rsa,ecdsa,ed25519
 
 
-  ppa_publish:
-    name: Upload release to Ubuntu PPA
-    needs: [details, setup_and_build]
+  deb_build:
+    name: Build .deb packages
+    # needs: [details, python_build]
+    needs: [python_build]
     runs-on: ubuntu-latest
     environment:
       name: release
     steps:
       - uses: actions/checkout@v4
 
-      - name: Fetch latest version from PPA
-        run: |
-          latest_ppa_version=$(apt-cache policy ${{ env.PACKAGE_NAME }} | grep Candidate | awk '{print $2}')
-          echo "Latest version on PPA: $latest_ppa_version"
-          echo "latest_ppa_version=$latest_ppa_version" >> $GITHUB_ENV
-
-      - name: Compare versions and exit if not newer
-        run: |
-          NEW_VERSION=${{ needs.details.outputs.new_version }}
-          LATEST_VERSION=$latest_ppa_version
-          if [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
-            echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on PPA."
-            exit 1
-          else
-            echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on PPA."
-          fi
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v3
+      - name: Download python builds
+        uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
 
-      - name: Publish to PPA
-        uses: yuezk/publish-ppa-package@v2
-        with:
-          repository: "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}"
-          gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.PPA_GPG_PASSPHRASE }}
-          deb_email: "${{ env.AUTHOR_EMAIL }}"
-          deb_fullname: "${{ env.AUTHOR_NAME }}"
-          tarball: dist/${{ env.PACKAGE_NAME }}-*.tar.gz
-          debian_dir: packaging/ppa/debian
-
-      - run: |
-          find  /tmp/ -name "*.deb" -exec mv {} ./ \;
+      - name: Build packages
+        run: |
+          ls -l dist/
+          # Usage: build_deb.sh <deb_dir> <tarball> <email> <gpg_private_key> <gpg_passphrase>
+          bash packaging/ppa/build_deb.sh packaging/ppa/debian dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }} xd xd
+          ls -l /tmp/debs/
 
       - name: Upload .deb package as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: deb-package
-          path: ./*.deb
+          name: debs
+          path: /tmp/debs/
+
+
+  ppa_publish:
+    name: Upload release to Ubuntu PPA
+    # needs: [details, python_build]
+    needs: ["deb_build"]
+    runs-on: ubuntu-latest
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v4
+
+      # - name: Fetch latest version from PPA
+      #   run: |
+      #     latest_ppa_version=$(apt-cache policy ${{ env.PACKAGE_NAME }} | grep Candidate | awk '{print $2}')
+      #     echo "Latest version on PPA: $latest_ppa_version"
+      #     echo "latest_ppa_version=$latest_ppa_version" >> $GITHUB_ENV
+      #
+      # - name: Compare versions and exit if not newer
+      #   run: |
+      #     NEW_VERSION=${{ needs.details.outputs.new_version }}
+      #     LATEST_VERSION=$latest_ppa_version
+      #     if [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
+      #       echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on PPA."
+      #       exit 1
+      #     else
+      #       echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on PPA."
+      #     fi
+
+      - name: Download python builds
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Download debian builds
+        uses: actions/download-artifact@v4
+        with:
+          name: debs
+          path: debs/
+
+      - run: |
+          ls -l dist/
+          ls -l debs/
+
+          # Usage: build_deb.sh <deb_dir> <tarball> <email> <gpg_private_key> <gpg_passphrase>
+          # bash packaging/ppa/build_deb.sh packaging/ppa/debian dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }} xd xd
+
+      # - name: Publish to PPA
+      #   uses: yuezk/publish-ppa-package@v2
+      #   with:
+      #     repository: "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}"
+      #     gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+      #     gpg_passphrase: ${{ secrets.PPA_GPG_PASSPHRASE }}
+      #     deb_email: "${{ env.AUTHOR_EMAIL }}"
+      #     deb_fullname: "${{ env.AUTHOR_NAME }}"
+      #     tarball: dist/${{ env.PACKAGE_NAME }}-*.tar.gz
+      #     debian_dir: packaging/ppa/debian
+      #
+
+      # - name: Upload .deb package as artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: deb
+      #     path: ./*.deb
+
+
+  # # TODO edit to run on ubuntu-latest
+  # copr_publish:
+  #   name: Upload release to COPR
+  #   needs: [details, python_build]
+  #   runs-on: ubuntu-latest
+  #   environment:
+  #     name: release
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #
+  #     - name: Build RPM package
+  #       run: |
+  #         bash packaging/copr/build_rpm.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} 1 ${{ env.LICENSE }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }}
+  #
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: dist
+  #         path: dist/*.rpm
+  #
+  #     - name: Install COPR CLI
+  #       run: |
+  #         sudo dnf install -y copr-cli
+  #
+  #     - name: Set up COPR credentials
+  #       run: |
+  #         echo "$COPR_API_KEY" > ~/.copr_api_key
+  #         echo "copr_username=${{ env.COPR_USER }}" > ~/.copr_config
+  #       env:
+  #         COPR_API_KEY: ${{ secrets.COPR_API_KEY }}
+  #
+  #     - name: Fetch latest version from COPR
+  #       run: |
+  #         latest_copr_version=$(copr-cli build list --project=${{ env.COPR_PROJECT }} --chroot=fedora-34-x86_64 | grep -oP "(?<=${{ env.PACKAGE_NAME }}-)[0-9.]+(?=\s)" | head -n 1 || echo "0.0.0")
+  #         echo "Latest version on COPR: $latest_copr_version"
+  #         echo "latest_copr_version=$latest_copr_version" >> $GITHUB_ENV
+  #
+  #     - name: Compare versions and exit if not newer
+  #       run: |
+  #         NEW_VERSION=${{ needs.details.outputs.new_version }}
+  #         LATEST_VERSION=$latest_copr_version
+  #         if [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
+  #           echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on COPR."
+  #           exit 1
+  #         else
+  #           echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on COPR."
+  #         fi
+  #
+  #     - name: Publish to COPR
+  #       run:
+  #         copr-cli build create --project="${{ env.PACKAGE_NAME }}" --chroot="fedora-34-x86_64" --src="${{ github.workspace }}/dist/${{ env.PACKAGE_NAME }}-*.tar.gz" --description="Package for COPR" --nvr="${{ env.PACKAGE_NAME }}-${{ github.sha }}"
 
 
   github_release:
     name: Create GitHub Release
-    needs: [details, setup_and_build, ppa_publish]
+    needs: [details, python_build, ppa_publish]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -215,15 +314,9 @@ jobs:
           fetch-depth: 0
 
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: dist
-          path: dist/
-
-      - name: Download .deb package
-        uses: actions/download-artifact@v3
-        with:
-          name: deb-package
           path: dist/
 
       - name: Create GitHub Release

@@ -1,0 +1,47 @@
+Name:           %{name}
+Version:        %{version}
+Release:        %{release}%{?dist}
+Summary:        A brief description of the package
+
+License:        %{license}
+URL:            https://github.com/%{author_name}/%{name}
+Source0:        %{name}-%{version}.tar.gz
+
+BuildArch:      noarch
+
+BuildRequires:  python3-devel, python3-build
+
+Requires: python3-rich
+Requires: python3-docopt
+Requires: python3-pyyaml
+Requires: python3-jinja2
+Requires: python3-requests
+Requires: python3-psutil
+Requires: python3-numpy
+Requires: python3-pillow
+Requires: python3-pydantic
+Requires: python3-typing-extensions
+
+%description
+A longer description of the package.
+
+%prep
+%autosetup
+
+%build
+python3 -m build
+
+%install
+%{__mkdir_p} %{buildroot}%{python3_sitelib}
+python3 -m pip install --root=%{buildroot} --prefix=/usr --no-deps --ignore-installed dist/%{name}-%{version}.tar.gz
+
+
+%files
+%doc README.md LICENSE
+%{_bindir}/pimp
+%{_libdir}/python3.13/site-packages/%{name}/*
+%{_libdir}/python3.13/site-packages/%{name}-%{version}.dist-info/*
+
+%changelog
+* %{date} %{author_name} <%{author_email}> - %{version}-%{release}
+- New upstream release

@@ -2,7 +2,7 @@
 pkgname={{pkgname}}
 provides=("$pkgname")
 conflicts=("${pkgname}-git" "$pkgname")
-pkgdesc="The overkill theme manager"
+pkgdesc="{{pkgdesc}}"
 url="https://github.com/{{author}}/{{pkgname}}"
 pkgver={{pkgver}}
 pkgrel=1
@@ -41,6 +41,5 @@ package() {
     cd "$srcdir/$pkgname-$pkgver" || exit 1
     python -m installer --destdir="$pkgdir" dist/*.whl || exit 1
 
-    # license
     install -Dm0644 -t "$pkgdir/usr/share/licenses/${pkgname}" LICENSE || exit 1
 }
