@@ -11,7 +11,8 @@ from pydantic import BaseModel, Field, computed_field, validator
 from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
-from pimpmyrice.colors import Color, LinkPalette, Palette, exp_gen_palette
+from pimpmyrice.color_gen import gen_palette
+from pimpmyrice.colors import Color, LinkPalette, Palette
 from pimpmyrice.logger import get_logger
 from pimpmyrice.utils import AttrDict, DictOrAttrDict, Result, get_thumbnail
 
@@ -117,8 +118,8 @@ async def gen_from_img(
     if not image.is_file():
         return res.error(f'image not found at "{image}"')
 
-    dark_colors = await exp_gen_palette(image)
-    light_colors = await exp_gen_palette(image, light=True)
+    dark_colors = await gen_palette(image)
+    light_colors = await gen_palette(image, light=True)
     modes = {
         "dark": Mode(name="dark", wallpaper=Wallpaper(path=image), palette=dark_colors),
         "light": Mode(

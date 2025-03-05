@@ -7,11 +7,17 @@ import rich
 
 from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
-from pimpmyrice.colors import GlobalPalette, exp_gen_palette, get_palettes
+from pimpmyrice.color_gen import gen_palette
+from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
-from pimpmyrice.config import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
+from pimpmyrice.config import (
+    BASE_STYLE_FILE,
+    CONFIG_FILE,
+    STYLES_DIR,
+    THEMES_DIR,
+)
 from pimpmyrice.events import EventHandler
-from pimpmyrice.files import check_config_dirs, download_file, load_json, save_json
+from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module import ModuleManager
 from pimpmyrice.theme_utils import Mode, Style, Theme, ThemeConfig
@@ -23,7 +29,7 @@ log = get_logger(__name__)
 class ThemeManager:
     def __init__(self) -> None:
         timer = Timer()
-        check_config_dirs()
+        create_config_dirs()
         self.base_style = self.get_base_style()
         self.styles = self.get_styles()
         self.palettes = self.get_palettes()
@@ -199,6 +205,7 @@ class ThemeManager:
                 )
 
         dump = tutils.dump_theme_for_file(theme)
+
         save_json(theme_dir / "theme.json", dump)
         # save_yaml(theme_dir / "theme.yaml", dump)
 
@@ -240,7 +247,7 @@ class ThemeManager:
             if regen_colors:
                 for mode_name in mode_names:
                     if mode_name not in theme.modes:
-                        palette = await exp_gen_palette(
+                        palette = await gen_palette(
                             img=theme.wallpaper.path, light=("light" in mode_name)
                         )
                         theme.modes[mode_name] = Mode(
@@ -251,7 +258,7 @@ class ThemeManager:
                     else:
                         mode = theme.modes[mode_name]
                         if mode.wallpaper:
-                            mode.palette = await exp_gen_palette(
+                            mode.palette = await gen_palette(
                                 img=mode.wallpaper.path, light=("light" in mode.name)
                             )
             save_res = await self.save_theme(theme=theme, old_name=theme.name)

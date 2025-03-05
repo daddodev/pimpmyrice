@@ -13,7 +13,6 @@ from pimpmyrice.config import (
     BASE_STYLE_FILE,
     CONFIG_FILE,
     JSON_SCHEMA_DIR,
-    LOG_FILE,
     MODULES_DIR,
     PALETTES_DIR,
     STYLES_DIR,
