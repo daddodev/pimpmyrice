@@ -52,11 +52,13 @@ class Color:
 
     @staticmethod
     def _parse_str(value: str) -> tuple[int, int, int, int]:
-        # TODO parse rgb(a), hsla, hsv(a)
+        # TODO parse rgb(a), hsla, hsva
         if value.startswith("#"):
             return Color._parse_hex(value)
         elif value.startswith("hsl("):
             return Color._parse_hsl(value)
+        elif value.startswith("hsv("):
+            return Color._parse_hsv(value)
         raise ValueError(f'Invalid color string format: "{value}"')
 
     @staticmethod
@@ -80,6 +82,21 @@ class Color:
         lightness = int(hsl_match.group(3))
 
         r, g, b = colorsys.hls_to_rgb(hue / 360, lightness / 100, saturation / 100)
+        rgb = tuple(int(x * 255) for x in (r, g, b))
+
+        return rgb + (255,)  # type: ignore
+
+    @staticmethod
+    def _parse_hsv(value: str) -> tuple[int, int, int, int]:
+        hsv_match = re.match(r"hsv\((\d+),\s*(\d+)%?,\s*(\d+)%?\)", value)
+        if not hsv_match:
+            raise ValueError("Invalid HSV string format")
+
+        h = int(hsv_match.group(1))
+        s = int(hsv_match.group(2))
+        v = int(hsv_match.group(3))
+
+        r, g, b = colorsys.hsv_to_rgb(h / 360, s / 100, v / 100)
         rgb = tuple(int(x * 255) for x in (r, g, b))
 
         return rgb + (255,)  # type: ignore
@@ -146,20 +163,43 @@ class Color:
         hsv = (int(h * 360), int(s * 100), int(v * 100))
         return hsv + (self._rgba[3],) if alpha else hsv
 
-    @property
-    def alt(self) -> "Color":
-        h, s, l = self.hsl_tuple()
-        if l > 50:
-            l -= 10
-        else:
-            l += 10
-        clr = Color(f"hsl({h}, {s}%, {l}%)")
-        clr._rgba = clr._rgba[:3] + (self._rgba[3],)
-        return clr
+    def adjust(
+        self,
+        sat: int | str | None = None,  # example: "+10", "-10", 30, None
+        min_sat: int | None = None,
+        max_sat: int | None = None,
+        val: int | str | None = None,
+        min_val: int | None = None,
+        max_val: int | None = None,
+    ) -> "Color":
+        def _adjust(
+            value: int,
+            adjustment: int | str | None,
+            min_val: int | None,
+            max_val: int | None,
+        ) -> int:
+            if isinstance(adjustment, str):
+                if adjustment.startswith("+"):
+                    value += int(adjustment[1:])
+                elif adjustment.startswith("-"):
+                    value -= int(adjustment[1:])
+                else:
+                    raise ValueError(f'invalid adjustment format: "{adjustment}"')
+            elif isinstance(adjustment, int):
+                value = adjustment
 
-    @property
-    def maxsat(self) -> "Color":
-        clr = Color(f"hsl({self.hsl_tuple()[0]}, 100%, 50%)")
+            if min_val is not None:
+                value = max(min_val, value)
+            if max_val is not None:
+                value = min(max_val, value)
+
+            return max(0, min(100, value))
+
+        h, s, v = self.hsv_tuple()
+        s = _adjust(s, sat, min_sat, max_sat)
+        v = _adjust(v, val, min_val, max_val)
+
+        clr = Color(f"hsv({h}, {s}%, {v}%)")
         clr._rgba = clr._rgba[:3] + (self._rgba[3],)
         return clr
 
