@@ -175,16 +175,10 @@ class PythonAction(BaseModel):
         res = Result()
 
         try:
-            spec = importlib.util.spec_from_file_location(self.module_name, file_path)
-            if not spec or not spec.loader:
-                raise ImportError(f'could not load "{file_path}"')
-            py_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(py_module)
-
-            fn = getattr(py_module, self.function_name)
+            fn = get_func_from_py_file(file_path, self.function_name)
 
             res.debug(
-                f"{file_path.name}:{self.function_name} loaded",
+                f"{file_path}:{self.function_name} loaded",
                 self.module_name,
             )
 
@@ -428,6 +422,18 @@ class Module(BaseModel):
         res.info(f"done in {res.time:.2f} sec", self.name)
         res.ok = True
         return res
+
+
+def get_func_from_py_file(py_file: Path, func_name: str) -> Any:
+    spec = importlib.util.spec_from_file_location(f"pimp_imported_{py_file}", py_file)
+    if not spec or not spec.loader:
+        raise ImportError(f'could not load "{py_file}"')
+    py_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(py_module)
+
+    func = getattr(py_module, func_name)
+
+    return func
 
 
 def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:

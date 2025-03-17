@@ -14,6 +14,7 @@ from pimpmyrice.config import (
     CONFIG_FILE,
     JSON_SCHEMA_DIR,
     MODULES_DIR,
+    PALETTE_GENERATORS_DIR,
     PALETTES_DIR,
     STYLES_DIR,
     TEMP_DIR,
@@ -92,6 +93,7 @@ def create_config_dirs() -> None:
         STYLES_DIR,
         PALETTES_DIR,
         MODULES_DIR,
+        PALETTE_GENERATORS_DIR,
         TEMP_DIR,
         JSON_SCHEMA_DIR,
     ]:
@@ -106,6 +108,8 @@ def create_config_dirs() -> None:
     if not CONFIG_FILE.exists():
         config = {"theme": None, "mode": "dark"}
         save_json(CONFIG_FILE, config)
+
+    # TODO default palette generators
 
     # if not VENV_DIR.exists():
     #     create_venv()

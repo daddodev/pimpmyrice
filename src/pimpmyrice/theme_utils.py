@@ -5,15 +5,18 @@ import unicodedata
 from copy import deepcopy
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Tuple
 
 from pydantic import BaseModel, Field, computed_field, validator
 from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
-from pimpmyrice.color_gen import gen_palette
 from pimpmyrice.colors import Color, LinkPalette, Palette
+from pimpmyrice.config import PALETTE_GENERATORS_DIR
+from pimpmyrice.dark_generator import gen_palette as dark_generator
+from pimpmyrice.light_generator import gen_palette as light_generator
 from pimpmyrice.logger import get_logger
+from pimpmyrice.module_utils import get_func_from_py_file
 from pimpmyrice.utils import AttrDict, DictOrAttrDict, Result, get_thumbnail
 
 if TYPE_CHECKING:
@@ -23,6 +26,28 @@ log = get_logger(__name__)
 
 
 Style = dict[str, Any]
+
+PaletteGeneratorType = Callable[[Path], Awaitable[Palette]]
+
+
+def get_palette_generators() -> dict[str, PaletteGeneratorType]:
+    generators: dict[str, PaletteGeneratorType] = {
+        "dark": dark_generator,
+        "light": light_generator,
+    }
+
+    for gen_path in PALETTE_GENERATORS_DIR.iterdir():
+        if gen_path.is_file() and gen_path.suffix == ".py":
+            try:
+                gen_fn = get_func_from_py_file(gen_path, "gen_palette")
+            except Exception as e:
+                log.error(e, f'error loading palette generator at "{gen_path}"')
+                log.exception(e)
+                continue
+
+            generators[gen_path.stem] = gen_fn
+
+    return generators
 
 
 class ThemeConfig(BaseModel):
@@ -111,6 +136,7 @@ def dump_theme_for_file(theme: Theme) -> dict[str, Any]:
 async def gen_from_img(
     image: Path,
     themes: dict[str, Theme],
+    generators: dict[str, PaletteGeneratorType],
     name: str | None = None,
 ) -> Result[Theme]:
     res: Result[Theme] = Result()
@@ -118,18 +144,20 @@ async def gen_from_img(
     if not image.is_file():
         return res.error(f'image not found at "{image}"')
 
-    dark_colors = await gen_palette(image)
-    light_colors = await gen_palette(image, light=True)
-    modes = {
-        "dark": Mode(name="dark", wallpaper=Wallpaper(path=image), palette=dark_colors),
-        "light": Mode(
-            name="light", wallpaper=Wallpaper(path=image), palette=light_colors
-        ),
-    }
+    theme_modes: dict[str, Mode] = {}
+    for gen_name, gen_fn in generators.items():
+        try:
+            palette = await gen_fn(image)
+        except Exception as e:
+            res.exception(e, f'error generating palette for "{gen_name}" mode')
+            continue
+
+        mode = Mode(name=gen_name, wallpaper=Wallpaper(path=image), palette=palette)
+        theme_modes[gen_name] = mode
 
     theme_name = valid_theme_name(name or image.stem, themes)
     theme = Theme(
-        name=theme_name, path=Path(), wallpaper=Wallpaper(path=image), modes=modes
+        name=theme_name, path=Path(), wallpaper=Wallpaper(path=image), modes=theme_modes
     )
 
     res.value = theme

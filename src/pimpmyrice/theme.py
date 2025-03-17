@@ -7,20 +7,21 @@ import rich
 
 from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
-from pimpmyrice.color_gen import gen_palette
 from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
-from pimpmyrice.config import (
-    BASE_STYLE_FILE,
-    CONFIG_FILE,
-    STYLES_DIR,
-    THEMES_DIR,
-)
+from pimpmyrice.config import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.events import EventHandler
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
 from pimpmyrice.logger import get_logger
 from pimpmyrice.module import ModuleManager
-from pimpmyrice.theme_utils import Mode, Style, Theme, ThemeConfig
+from pimpmyrice.theme_utils import (
+    Mode,
+    PaletteGeneratorType,
+    Style,
+    Theme,
+    ThemeConfig,
+    get_palette_generators,
+)
 from pimpmyrice.utils import Result, Timer
 
 log = get_logger(__name__)
@@ -33,6 +34,7 @@ class ThemeManager:
         self.base_style = self.get_base_style()
         self.styles = self.get_styles()
         self.palettes = self.get_palettes()
+        self.palette_generators = self.get_palette_generators()
         self.tags: set[str] = set()
         self.themes = self.get_themes()
         self.config = self.get_config()
@@ -80,6 +82,10 @@ class ThemeManager:
     @staticmethod
     def get_palettes() -> dict[str, GlobalPalette]:
         return get_palettes()
+
+    @staticmethod
+    def get_palette_generators() -> dict[str, PaletteGeneratorType]:
+        return get_palette_generators()
 
     def parse_theme(self, theme_path: Path) -> Theme:
         theme = parsers.parse_theme(theme_path)
@@ -130,7 +136,12 @@ class ThemeManager:
         else:
             file = Path(image)
 
-        gen_res = await tutils.gen_from_img(image=file, name=name, themes=self.themes)
+        gen_res = await tutils.gen_from_img(
+            image=file,
+            name=name,
+            generators=self.palette_generators,
+            themes=self.themes,
+        )
         res += gen_res
         if not gen_res.value:
             return res.error("could not generate theme")
@@ -242,25 +253,22 @@ class ThemeManager:
             if exclude_tags and any(tag in exclude_tags for tag in theme.tags):
                 continue
 
-            mode_names = {"light", "dark", *theme.modes.keys()}
-
             if regen_colors:
-                for mode_name in mode_names:
-                    if mode_name not in theme.modes:
-                        palette = await gen_palette(
-                            img=theme.wallpaper.path, light=("light" in mode_name)
-                        )
-                        theme.modes[mode_name] = Mode(
-                            name=mode_name,
+                for gen_name, gen_fn in self.palette_generators.items():
+                    if gen_name not in theme.modes:
+                        palette = await gen_fn(theme.wallpaper.path)
+                        theme.modes[gen_name] = Mode(
+                            name=gen_name,
                             wallpaper=theme.wallpaper,
                             palette=palette,
                         )
                     else:
-                        mode = theme.modes[mode_name]
-                        if mode.wallpaper:
-                            mode.palette = await gen_palette(
-                                img=mode.wallpaper.path, light=("light" in mode.name)
-                            )
+                        mode = theme.modes[gen_name]
+                        if not mode.wallpaper:
+                            # should not happen, TODO refactor mode
+                            continue
+                        mode.palette = await gen_fn(mode.wallpaper.path)
+
             save_res = await self.save_theme(theme=theme, old_name=theme.name)
             if save_res.value:
                 res.success(f'theme "{theme.name}" rewritten')

@@ -163,20 +163,45 @@ class Color:
         hsv = (int(h * 360), int(s * 100), int(v * 100))
         return hsv + (self._rgba[3],) if alpha else hsv
 
-    def adjust(
+    def contrasting(self, base: Color | None = None, val_delta: int = 75) -> Color:
+        h, s, v = self.hsv_tuple()
+
+        if base:
+            base_h, base_s, base_v = base.hsv_tuple()
+            if base_v < 50:
+                v = min(base_v + val_delta, 100)
+            else:
+                v = max(base_v - val_delta, 0)
+        else:
+            if v < 50:
+                v = min(v + val_delta, 100)
+            else:
+                v = max(v - val_delta, 0)
+
+        return Color(f"hsv({h}, {s}%, {v}%)")
+
+    def adjusted(
         self,
-        sat: int | str | None = None,  # example: "+10", "-10", 30, None
+        hue: int | str | None = None,  # example: "+10", "-10", 30, None
+        min_hue: int | None = None,
+        max_hue: int | None = None,
+        sat: int | str | None = None,
         min_sat: int | None = None,
         max_sat: int | None = None,
         val: int | str | None = None,
         min_val: int | None = None,
         max_val: int | None = None,
     ) -> "Color":
+        """
+        using HSV
+        """
+
         def _adjust(
             value: int,
             adjustment: int | str | None,
             min_val: int | None,
             max_val: int | None,
+            wrap_basis: int | None,
         ) -> int:
             if isinstance(adjustment, str):
                 if adjustment.startswith("+"):
@@ -193,15 +218,23 @@ class Color:
             if max_val is not None:
                 value = min(max_val, value)
 
-            return max(0, min(100, value))
+            if wrap_basis:
+                value %= wrap_basis
+                return max(0, min(wrap_basis, value))
+            else:
+                return max(0, min(100, value))
 
         h, s, v = self.hsv_tuple()
-        s = _adjust(s, sat, min_sat, max_sat)
-        v = _adjust(v, val, min_val, max_val)
+        h = _adjust(h, hue, min_hue, max_hue, 360)
+        s = _adjust(s, sat, min_sat, max_sat, None)
+        v = _adjust(v, val, min_val, max_val, None)
 
         clr = Color(f"hsv({h}, {s}%, {v}%)")
         clr._rgba = clr._rgba[:3] + (self._rgba[3],)
         return clr
+
+    def copy(self) -> "Color":
+        return Color(self)
 
     def __str__(self) -> str:
         return self.hex if self.alpha == 255 else self.hexa
