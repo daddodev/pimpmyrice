@@ -1,3 +1,4 @@
+import logging
 import random
 import shutil
 from pathlib import Path
@@ -12,7 +13,6 @@ from pimpmyrice.completions import generate_shell_suggestions
 from pimpmyrice.config import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.events import EventHandler
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
-from pimpmyrice.logger import get_logger
 from pimpmyrice.module import ModuleManager
 from pimpmyrice.theme_utils import (
     Mode,
@@ -22,9 +22,9 @@ from pimpmyrice.theme_utils import (
     ThemeConfig,
     get_palette_generators,
 )
-from pimpmyrice.utils import Result, Timer
+from pimpmyrice.utils import Timer
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 class ThemeManager:
@@ -123,77 +123,52 @@ class ThemeManager:
         name: str | None = None,
         tags: set[str] | None = None,
         apply: bool = False,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         if image.startswith(("http://", "https://")):
-            download_res = download_file(image)
-            if download_res.value is None:
-                res += download_res
-                return res.error("could not download file")
-            file = download_res.value
-            res.info(f'downloaded "{file.name}"')
+            file = download_file(image)
+            log.info(f'downloaded "{file.name}"')
         else:
             file = Path(image)
 
-        gen_res = await tutils.gen_from_img(
+        theme = await tutils.gen_from_img(
             image=file,
             name=name,
             generators=self.palette_generators,
             themes=self.themes,
         )
-        res += gen_res
-        if not gen_res.value:
-            return res.error("could not generate theme")
 
         if tags:
-            gen_res.value.tags = tags
+            theme.tags = tags
 
         # TODO generate name here
-        save_res = await self.save_theme(gen_res.value)
-        res += save_res
-        if save_res.value:
-            res.success(f'theme "{save_res.value}" generated')
-        else:
-            return res.error("could not generate theme")
+        await self.save_theme(theme)
+        log.info(f'theme "{theme.name}" generated')
 
         if apply:
-            apply_res = await self.apply_theme(save_res.value)
-            res += apply_res
-
-        res.ok = True
-        return res
+            await self.apply_theme(theme.name)
 
     async def rename_theme(
         self,
         theme_name: str,
         new_name: str,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         if theme_name not in self.themes:
-            return res.error(f'theme "{theme_name}" not found')
+            raise Exception(f'theme "{theme_name}" not found')
 
         theme = self.themes[theme_name]
         old_name = theme.name
         theme.name = new_name
 
-        save_res = await self.save_theme(theme, old_name=old_name)
-        res += save_res
+        await self.save_theme(theme, old_name=old_name)
 
-        if not save_res.value:
-            return res.error(f'failed renaming theme "{theme_name}"')
-
-        res.ok = True
-        return res.success(f'renamed theme "{theme_name}" to "{new_name}"')
+        log.info(f'renamed theme "{theme_name}" to "{new_name}"')
 
     async def save_theme(
         self,
         theme: Theme,
         old_name: str | None = None,
-    ) -> Result[str]:
-        res: Result[str] = Result()
-
+    ) -> str:
+        # TODO move theme name check
         if not old_name:
             theme.name = tutils.valid_theme_name(name=theme.name, themes=self.themes)
             theme_dir = THEMES_DIR / theme.name
@@ -230,9 +205,7 @@ class ThemeManager:
             if self.config.theme == old_name:
                 self.config.theme = theme.name
 
-        res.value = theme.name
-        res.ok = True
-        return res
+        return theme.name
 
     async def rewrite_themes(
         self,
@@ -240,9 +213,7 @@ class ThemeManager:
         name_includes: str | None = None,
         include_tags: set[str] | None = None,
         exclude_tags: set[str] | None = None,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         for theme in self.themes.values():
             if name_includes and name_includes not in theme.name:
                 continue
@@ -269,25 +240,17 @@ class ThemeManager:
                             continue
                         mode.palette = await gen_fn(mode.wallpaper.path)
 
-            save_res = await self.save_theme(theme=theme, old_name=theme.name)
-            if save_res.value:
-                res.success(f'theme "{theme.name}" rewritten')
-            else:
-                res += save_res
+            await self.save_theme(theme=theme, old_name=theme.name)
+            log.info(f'theme "{theme.name}" rewritten')
 
-        res.ok = True
-        return res
-
-    def delete_theme(self, theme_name: str) -> Result:
-        res = Result()
-
+    def delete_theme(self, theme_name: str) -> None:
         if theme_name not in self.themes:
-            return res.error(f'theme "{theme_name}" not found')
+            raise Exception(f'theme "{theme_name}" not found')
 
         theme = self.themes[theme_name]
 
         if not str(theme.path).startswith(str(THEMES_DIR)) or theme.path == THEMES_DIR:
-            return res.error(f'"{theme.path}" not in "{THEMES_DIR}"')
+            raise Exception(f'"{theme.path}" not in "{THEMES_DIR}"')
 
         shutil.rmtree(theme.path)
 
@@ -295,8 +258,7 @@ class ThemeManager:
             self.config.theme = None
         self.themes.pop(theme_name)
 
-        res.ok = True
-        return res.success(f'theme "{theme_name}" deleted')
+        log.info(f'theme "{theme_name}" deleted')
 
     async def apply_theme(
         self,
@@ -307,61 +269,44 @@ class ThemeManager:
         include_modules: list[str] | None = None,
         exclude_modules: list[str] | None = None,
         print_theme_dict: bool = False,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         if not theme_name:
             if not self.config.theme:
-                return res.error("No current theme")
+                raise Exception("No current theme")
             theme_name = self.config.theme
         elif theme_name not in self.themes:
-            return res.error(f'"{theme_name}" not found')
+            raise Exception(f'"{theme_name}" not found')
 
         if not mode_name:
             mode_name = self.config.mode
 
-        r = tutils.gen_theme_dict(
-            self,
-            theme_name=theme_name,
-            mode_name=mode_name,
-            styles_names=styles_names,
-            palette_name=palette_name,
-        )
-        res += r
-
-        if not r.value:
-            return res.error(
-                f'error generating the theme_dict for theme "{theme_name}"'
+        try:
+            theme_dict = tutils.gen_theme_dict(
+                self,
+                theme_name=theme_name,
+                mode_name=mode_name,
+                styles_names=styles_names,
+                palette_name=palette_name,
             )
-
-        theme_dict = r.value
+        except Exception as e:
+            log.error(str(e))
+            raise Exception(f'error generating the theme_dict for theme "{theme_name}"')
 
         if print_theme_dict:
             pretty = rich.pretty.pretty_repr(theme_dict)
-            res.info("generated theme_dict:\r\n" + pretty)
+            log.info("generated theme_dict:\r\n" + pretty)
 
-        res.info(f'applying theme "{theme_name}"...')
+        log.info(f'applying theme "{theme_name}"...')
 
-        modules_res = await self.mm.run_modules(
-            theme_dict, include_modules, exclude_modules
-        )
-
-        res += modules_res
+        await self.mm.run_modules(theme_dict, include_modules, exclude_modules)
 
         self.config.theme = theme_name
         self.config.mode = mode_name
         self.save_config()
 
-        # display_color_palette(palette.term)
-        if res.errors:
-            res.warning(f'theme "{theme_name}" {mode_name} applied with errors')
-        else:
-            res.success(f'theme "{theme_name}" {mode_name} applied')
+        log.info(f'theme "{theme_name}" {mode_name} applied')
 
         await self.event_handler.publish("theme_applied")
-
-        res.ok = True
-        return res
 
     async def set_random_theme(
         self,
@@ -374,9 +319,7 @@ class ThemeManager:
         include_tags: set[str] | None = None,
         exclude_tags: set[str] | None = None,
         print_theme_dict: bool = False,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         themes_list: list[Theme] = []
 
         for theme in self.themes.values():
@@ -395,10 +338,10 @@ class ThemeManager:
             themes_list.append(theme)
 
         if len(themes_list) < 1:
-            return res.error("no theme found")
+            raise Exception("no theme found")
 
         theme_name = random.choice(themes_list).name
-        apply_res = await self.apply_theme(
+        await self.apply_theme(
             theme_name,
             mode_name=mode_name,
             styles_names=styles_names,
@@ -408,54 +351,40 @@ class ThemeManager:
             print_theme_dict=print_theme_dict,
         )
 
-        res += apply_res
-
-        res.ok = True
-        return res
-
-    async def toggle_mode(self) -> Result:
+    async def toggle_mode(self) -> None:
         if not self.config.theme:
-            return Result().error("no theme set")
+            raise Exception("no theme set")
 
         mode_name = "light" if self.config.mode == "dark" else "dark"
 
-        return await self.apply_theme(mode_name=mode_name)
+        await self.apply_theme(mode_name=mode_name)
 
-    async def set_mode(self, mode_name: str) -> Result:
+    async def set_mode(self, mode_name: str) -> None:
         if not self.config.theme:
-            return Result().error("no theme set")
+            raise Exception("no theme set")
 
         return await self.apply_theme(mode_name=mode_name)
 
-    async def add_tags(self, themes_names: list[str], tags: set[str]) -> Result:
-        res = Result()
-
+    async def add_tags(self, themes_names: list[str], tags: set[str]) -> None:
         for theme_name in themes_names:
             if theme_name not in self.themes:
-                res.error('theme "{theme_name}" not found')
+                log.error('theme "{theme_name}" not found')
                 continue
 
             theme = self.themes[theme_name]
 
             for tag in tags:
                 theme.tags.add(tag)
-                save_res = await self.save_theme(theme, theme.name)
-                res += save_res
-                if not save_res.errors:
-                    res.info(f'tag "{tag}" added to theme "{theme.name}"')
+                await self.save_theme(theme, theme.name)
+                log.info(f'tag "{tag}" added to theme "{theme.name}"')
 
-        res.ok = True
-        return res
-
-    async def remove_tags(self, themes_names: list[str], tags: set[str]) -> Result:
-        res = Result()
-
+    async def remove_tags(self, themes_names: list[str], tags: set[str]) -> None:
         if len(themes_names) == 0:
             themes_names = list(self.themes.keys())
 
         for theme_name in themes_names:
             if theme_name not in self.themes:
-                res.error('theme "{theme_name}" not found')
+                log.error('theme "{theme_name}" not found')
                 continue
 
             theme = self.themes[theme_name]
@@ -463,49 +392,24 @@ class ThemeManager:
             for tag in tags:
                 if tag in theme.tags:
                     theme.tags.remove(tag)
-                    save_res = await self.save_theme(theme, theme.name)
-                    res += save_res
-                    if not save_res.errors:
-                        res.info(f'tag "{tag}" removed from theme "{theme.name}"')
+                    await self.save_theme(theme, theme.name)
+                    log.info(f'tag "{tag}" removed from theme "{theme.name}"')
 
-        res.ok = True
-        return res
-
-    async def list_themes(self) -> Result:
-        res = Result()
-
-        res.info("\nNAME\t\t\tTAGS\n")
+    async def list_themes(self) -> None:
+        log.info("\nNAME\t\t\tTAGS\n")
         for theme in self.themes.values():
-            res.info(f"{theme.name:10}\t\t{', '.join(theme.tags)}")
+            log.info(f"{theme.name:10}\t\t{', '.join(theme.tags)}")
 
-        res.ok = True
-        return res
+    async def list_tags(self) -> None:
+        log.info("\n".join(self.tags))
 
-    async def list_tags(self) -> Result:
-        res = Result()
-
-        res.info("\n".join(self.tags))
-
-        res.ok = True
-        return res
-
-    async def list_palettes(self) -> Result:
-        res = Result()
-
+    async def list_palettes(self) -> None:
         for palette in self.palettes:
-            res.info(f"{palette}")
+            log.info(f"{palette}")
 
-        res.ok = True
-        return res
-
-    async def list_styles(self) -> Result:
-        res = Result()
-
+    async def list_styles(self) -> None:
         for style in self.styles:
-            res.info(f"{style}")
-
-        res.ok = True
-        return res
+            log.info(f"{style}")
 
     async def export_theme(
         self,
@@ -517,11 +421,9 @@ class ThemeManager:
         include_modules: list[str] | None = None,
         exclude_modules: list[str] | None = None,
         print_theme_dict: bool = False,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         if theme_name not in self.themes:
-            return res.error(f'theme "{theme_name}" not found')
+            raise Exception(f'theme "{theme_name}" not found')
 
         if not mode_name:
             mode_name = self.config.mode
@@ -529,40 +431,39 @@ class ThemeManager:
         dump_dir = out_dir / f"{theme_name}_{mode_name}"
 
         if dump_dir.exists():
-            return res.error(f'directory "{dump_dir}" already exists')
+            raise Exception(f'directory "{dump_dir}" already exists')
 
-        gen_res = tutils.gen_theme_dict(
-            self,
-            theme_name=theme_name,
-            mode_name=mode_name,
-            styles_names=styles_names,
-            palette_name=palette_name,
-        )
-        res += gen_res
-
-        if not gen_res.value:
-            return res.error(
-                f'error generating the theme_dict for theme "{theme_name}"'
+        try:
+            theme_dict = tutils.gen_theme_dict(
+                self,
+                theme_name=theme_name,
+                mode_name=mode_name,
+                styles_names=styles_names,
+                palette_name=palette_name,
             )
-        theme_dict = gen_res.value
+        except Exception as e:
+            log.error(str(e))
+            raise Exception(f'error generating the theme_dict for theme "{theme_name}"')
 
         if print_theme_dict:
             pretty = rich.pretty.pretty_repr(theme_dict)
-            res.info("generated theme_dict:\r\n" + pretty)
+            log.info("generated theme_dict:\r\n" + pretty)
 
-        modules_res = await self.mm.run_modules(
+        # TODO check success
+        await self.mm.run_modules(
             theme_dict, include_modules, exclude_modules, dump_dir
         )
 
-        res += modules_res
-        if not modules_res.value:
-            return res.error(f'error exporting theme "{theme_name}"')
+        # res += modules_res
+        # if not modules_res.value:
+        #     return res.error(f'error exporting theme "{theme_name}"')
 
         theme = self.themes[theme_name]
 
         wp = theme.modes[mode_name].wallpaper
         if not wp:
-            return res
+            # should not happen
+            raise Exception("wallpaper not found")
 
         shutil.copy(wp.path, dump_dir)
 
@@ -574,13 +475,10 @@ Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `export theme
 
 """
 
-        for module_name in modules_res.value:
-            readme += f"- {module_name}\n"
+        # for module_name in modules_res.value:
+        #     readme += f"- {module_name}\n"
 
         with open(dump_dir / "README.md", "w", encoding="utf-8") as f:
             f.write(readme)
 
-        res.success(f'theme "{theme_name}" exported to {dump_dir}')
-
-        res.ok = True
-        return res
+        log.info(f'theme "{theme_name}" exported to {dump_dir}')

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from copy import deepcopy
 from typing import TYPE_CHECKING, Any
@@ -8,15 +9,13 @@ from pydantic import BaseModel, create_model
 
 from pimpmyrice.config import CLIENT_OS, JSON_SCHEMA_DIR, Os
 from pimpmyrice.files import save_json
-from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme
-from pimpmyrice.utils import Result
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def create_dynamic_model(name: str, source: dict[str, Any]) -> BaseModel:
@@ -51,9 +50,7 @@ def get_fonts(mono: bool = False) -> list[str]:
         return []
 
 
-def generate_theme_json_schema(tm: ThemeManager) -> Result:
-    res = Result()
-
+def generate_theme_json_schema(tm: ThemeManager) -> None:
     base_style = deepcopy(tm.base_style)
 
     for module in tm.mm.modules:
@@ -135,15 +132,13 @@ def generate_theme_json_schema(tm: ThemeManager) -> Result:
     schema_path = JSON_SCHEMA_DIR / "theme.json"
     save_json(schema_path, theme_schema)
 
-    return res.debug(f'theme schema saved to "{schema_path}"')
+    log.debug(f'theme schema saved to "{schema_path}"')
 
 
-def generate_module_json_schema() -> Result:
-    res = Result()
-
+def generate_module_json_schema() -> None:
     module_schema = Module.model_json_schema()
 
     schema_path = JSON_SCHEMA_DIR / "module.json"
     save_json(schema_path, module_schema)
 
-    return res.debug(f'module schema saved to "{schema_path}"')
+    log.debug(f'module schema saved to "{schema_path}"')

@@ -52,7 +52,7 @@ async def gen_palette(image_path: Path) -> Palette:
         "secondary": {"bg": secondary, "fg": secondary.contrasting()},
         "accent": {"bg": primary, "fg": primary.contrasting()},
         "destructive": {"bg": secondary, "fg": secondary.contrasting()},
-        "border": {"active": primary, "inactive": normal},
+        "border": {"active": primary, "inactive": normal.adjusted(val="+10")},
     }
 
     p = Palette(**palette)  # type: ignore

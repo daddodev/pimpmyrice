@@ -1,108 +1,19 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from copy import deepcopy
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic
+from typing import Any
 
 import jinja2
 import psutil
 from typing_extensions import TypeVar
 
 from pimpmyrice.config import CONFIG_DIR, HOME_DIR, MODULES_DIR
-from pimpmyrice.logger import LogLevel, get_logger
 
-# import jinja2schema
-
-
-log = get_logger(__name__)
-
-
-@dataclass
-class ResultRecord:
-    msg: str
-    level: LogLevel
-
-    def dump(self) -> dict[str, str]:
-        d = {"msg": self.msg, "level": self.level.name}
-        return d
-
-
-T = TypeVar("T", default=None)
-
-
-@dataclass
-class Result(Generic[T]):
-    value: T | None = None
-    name: str | None = None
-    errors: int = 0
-    records: list[ResultRecord] = field(default_factory=list)
-    time: float = 0
-    ok: bool = False
-
-    def __log(self, record: ResultRecord, name: str | None = None) -> None:
-        if name:
-            record.msg = f"{name}: {record.msg}"
-
-        if log.isEnabledFor(record.level.value):
-            log._log(level=record.level.value, msg=record.msg, args={})
-        self.records.append(record)
-
-    def debug(self, msg: str, name: str | None = None) -> Result[T]:
-        self.__log(ResultRecord(msg, LogLevel.DEBUG), name)
-        return self
-
-    def info(self, msg: str, name: str | None = None) -> Result[T]:
-        self.__log(ResultRecord(msg, LogLevel.INFO), name)
-        return self
-
-    def success(self, msg: str, name: str | None = None) -> Result[T]:
-        self.__log(ResultRecord(msg, LogLevel.SUCCESS), name)
-        return self
-
-    def warning(self, msg: str, name: str | None = None) -> Result[T]:
-        self.__log(ResultRecord(msg, LogLevel.WARNING), name)
-        return self
-
-    def error(self, msg: str, name: str | None = None) -> Result[T]:
-        self.__log(ResultRecord(msg, LogLevel.ERROR), name)
-        self.errors += 1
-        return self
-
-    def exception(
-        self, exception: Exception, message: str | None = None, name: str | None = None
-    ) -> Result[T]:
-        exc_str = str(exception).strip()
-
-        if message:
-            msg = f"{message}:\r\n{' ' * (len(name) + 2 if name else 0)}{exc_str}"
-        else:
-            msg = exc_str
-
-        self.__log(ResultRecord(msg, LogLevel.ERROR), name)
-
-        self.errors += 1
-
-        if log.isEnabledFor(LogLevel.DEBUG.value):
-            log.exception(exception)
-
-        return self
-
-    def __add__(self, other: Result[Any]) -> Result[T]:
-        r: Result[T] = Result(
-            name=self.name,
-            value=self.value,
-            errors=self.errors + other.errors,
-            records=[*self.records, *other.records],
-        )
-        return r
-
-    def dump(self) -> dict[str, Any]:
-        d = deepcopy(vars(self))
-        d["records"] = [r.dump() for r in self.records]
-        return d
+log = logging.getLogger(__name__)
 
 
 class Timer:

@@ -1,3 +1,4 @@
+import logging
 from functools import cache
 from pathlib import Path
 from typing import Any
@@ -7,9 +8,8 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from pimpmyrice.colors import Color
-from pimpmyrice.logger import get_logger
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def kmeans(

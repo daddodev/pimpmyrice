@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import shutil
 from copy import deepcopy
@@ -10,21 +11,22 @@ from typing import TYPE_CHECKING, Any
 from pimpmyrice import module_utils as mutils
 from pimpmyrice.config import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
 from pimpmyrice.files import save_yaml
-from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import (
     FileAction,
     IfRunningAction,
     Module,
+    ModuleState,
     PythonAction,
     ShellAction,
+    module_context_wrapper,
 )
 from pimpmyrice.parsers import parse_module
-from pimpmyrice.utils import AttrDict, Lock, Result, Timer, is_locked, parse_string_vars
+from pimpmyrice.utils import AttrDict, Lock, Timer, is_locked, parse_string_vars
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 class ModuleManager:
@@ -36,18 +38,24 @@ class ModuleManager:
         timer = Timer()
 
         for module_dir in MODULES_DIR.iterdir():
-            self.load_module(module_dir)
+            if not module_dir.is_dir() or not (
+                (module_dir / "module.yaml").exists()
+                or (module_dir / "module.json").exists()
+            ):
+                continue
+            try:
+                self.load_module(module_dir)
+            except Exception as e:
+                log.debug("exception:", exc_info=e)
+                log.error(f'error loading module "{module_dir.name}": {e}')
 
         log.debug(f"{len(self.modules)} modules loaded in {timer.elapsed():.4f} sec")
 
     def load_module(self, module_dir: Path) -> None:
-        module_res = parse_module(module_dir)
+        module = parse_module(module_dir)
 
-        if not module_res.value:
-            return
-
-        self.modules[module_res.value.name] = module_res.value
-        log.debug(f'module "{module_res.value.name}" loaded')
+        self.modules[module.name] = module
+        log.debug(f'module "{module.name}" loaded')
 
     async def run_modules(
         self,
@@ -55,100 +63,99 @@ class ModuleManager:
         include_modules: list[str] | None = None,
         exclude_modules: list[str] | None = None,
         out_dir: Path | None = None,
-    ) -> Result[set[str]]:
-        res: Result[set[str]] = Result()
-
-        executed_modules: set[str] = set()
-
-        timer = Timer()
-
-        for m in [*(include_modules or []), *(exclude_modules or [])]:
-            if m not in self.modules:
-                return res.error(f'module "{m}" not found')
+    ) -> dict[str, ModuleState]:
+        # TODO separate modules by type (run, pre_run, palette_generators...)
 
         if is_locked(LOCK_FILE)[0]:
-            return res.error("another instance is applying a theme!")
+            raise Exception("another instance is applying a theme!")
 
         with Lock(LOCK_FILE):
-            runners = []
-            pre_runners = []
-            if include_modules:
-                modules = {
-                    name: self.modules[name]
-                    for name in include_modules
-                    if name in self.modules
-                }
-            elif exclude_modules:
-                modules = {
-                    name: self.modules[name]
-                    for name in self.modules
-                    if name not in exclude_modules
-                }
-            else:
-                modules = self.modules
+            timer = Timer()
 
-            for name, module in modules.items():
-                if not module.enabled:
+            for m in [*(include_modules or []), *(exclude_modules or [])]:
+                if m not in self.modules:
+                    raise Exception(f'module "{m}" not found')
+
+            modules_state: dict[str, ModuleState] = {}
+            pre_runners = []
+            runners = []
+
+            for module_name, module in self.modules.items():
+                if (
+                    (include_modules and module_name not in include_modules)
+                    or (exclude_modules and module_name in exclude_modules)
+                    or not module.enabled
+                    or not (module.pre_run or module.run)
+                ):
+                    modules_state[module_name] = ModuleState.SKIPPED
                     continue
 
-                if module.pre_run:
-                    pre_runners.append(name)
+                modules_state[module_name] = ModuleState.PENDING
 
+                if module.pre_run:
+                    pre_runners.append(module_name)
                 if module.run:
-                    runners.append(name)
+                    runners.append(module_name)
 
             if len(runners) == 0:
-                res.error(
+                raise Exception(
                     f"no modules to run!\nSee {REPOS_BASE_ADDR} for available modules"
                 )
-                return res
 
             for name in pre_runners:
-                mod_timer = Timer()
+                mod_res = await module_context_wrapper(
+                    name,
+                    modules_state,
+                    self.modules[name].execute_pre_run(deepcopy(theme_dict)),
+                )
+                if not mod_res:
+                    continue
 
-                mod_res = await self.modules[name].execute_pre_run(deepcopy(theme_dict))
-                res += mod_res
+                theme_dict = mod_res
 
-                if mod_res.value:
-                    theme_dict = mod_res.value
-                    res.info(
-                        f"modifier applied in {mod_timer.elapsed():.2f} seconds", name
-                    )
-                    executed_modules.add(name)
+                modules_state[name] = (
+                    ModuleState.RUNNING
+                    if self.modules[name].run
+                    else ModuleState.COMPLETED
+                )
 
-            modules_state = {m: {"done": False} for m in self.modules}
-
-            tasks = [
-                self.modules[name].execute_run(
-                    theme_dict, modules_state=modules_state, out_dir=out_dir
+            runners_tasks = [
+                module_context_wrapper(
+                    name,
+                    modules_state,
+                    self.modules[name].execute_run(
+                        theme_dict, modules_state=modules_state, out_dir=out_dir
+                    ),
                 )
                 for name in runners
             ]
 
-            for t in asyncio.as_completed(tasks):
-                task_res = await t
-                if isinstance(task_res, Result):
-                    if task_res.name:
-                        executed_modules.add(task_res.name)
-                        modules_state[task_res.name]["done"] = True
-                    else:
-                        task_res.error("Result has no name")
+            for t in asyncio.as_completed(runners_tasks):
+                try:
+                    await t
+                except Exception as e:
+                    log.debug("exception:", exc_info=e)
+                    log.error(str(e))
 
-                    module_res = task_res
-                else:
-                    module_res = Result(name="how did this happen?")
-                    module_res.exception(task_res)
+            completed = skipped = failed = 0
+            for state in modules_state.values():
+                match state:
+                    case ModuleState.COMPLETED:
+                        completed += 1
+                    case ModuleState.SKIPPED:
+                        skipped += 1
+                    case ModuleState.FAILED:
+                        failed += 1
 
-                res += module_res
-
-            res.info(
-                f"{len({*pre_runners, *runners})} modules applied in {timer.elapsed():.2f} sec"
+            log.info(
+                f"{len(self.modules)} modules finished in {timer.elapsed():.2f} sec: "
+                f"{completed} completed, {skipped} skipped, {failed} failed"
             )
 
-            res.value = executed_modules
+            for name, state in modules_state.items():
+                log.debug(f"{name}: {state.name}")
 
-            res.ok = True
-            return res
+            return modules_state
 
     async def run_module_command(
         self,
@@ -157,59 +164,41 @@ class ModuleManager:
         command: str,
         *args: Any,
         **kwargs: Any,
-    ) -> Result:
-        res = Result()
+    ) -> None:
         if module_name not in self.modules:
-            return res.error(f'module "{module_name}" not found')
+            raise Exception(f'module "{module_name}" not found')
 
         module = self.modules[module_name]
-        res += await module.execute_command(command, tm, *args, **kwargs)
-
-        res.ok = True
-        return res
+        await module.execute_command(command, tm, *args, **kwargs)
 
     async def rewrite_modules(
         self,
         name_includes: str | None = None,
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         for module in self.modules.values():
             if name_includes and name_includes not in module.name:
                 continue
 
-            try:
-                dump = module.model_dump(mode="json")
+            dump = module.model_dump(mode="json")
 
-                save_yaml(MODULES_DIR / module.name / "module.yaml", dump)
-                # save_json(MODULES_DIR / module.name / "module.json", dump)
-                res.success(f'module "{module.name}" rewritten')
-            except Exception as e:
-                res.exception(e)
-        return res
+            save_yaml(MODULES_DIR / module.name / "module.yaml", dump)
+            # save_json(MODULES_DIR / module.name / "module.json", dump)
+            log.info(f'module "{module.name}" rewritten')
 
-    async def init_module(self, module_name: str) -> Result:
-        res = Result()
-
+    async def init_module(self, module_name: str) -> None:
         if module_name not in self.modules:
-            return res.error(f'module "{module_name}" not found')
+            raise Exception(f'module "{module_name}" not found')
 
         module = self.modules[module_name]
-        init_res = await module.execute_init()
-        res += init_res
+        await module.execute_init()
 
-        res.ok = True
-        return res
-
-    async def create_module(self, module_name: str) -> Result:
+    async def create_module(self, module_name: str) -> None:
         # TODO add --bare; README, LICENSE
 
-        res = Result()
-
-        res.debug(f'creating module "{module_name}"')
+        log.debug(f'creating module "{module_name}"')
 
         if module_name in self.modules:
-            return res.error(f'module "{module_name}" already present')
+            raise Exception(f'module "{module_name}" already present')
 
         module = Module(
             name=module_name,
@@ -238,119 +227,70 @@ class ModuleManager:
 
         with open(module_path / "apply.py", "w", encoding="utf-8") as f:
             f.write(
-                """def main(theme_dict): # can also be async
+                """async def main(theme_dict):
     print(theme_dict.wallpaper.path)
     print(theme_dict["wallpaper"].path)
     print(theme_dict)"""
             )
 
-        try:
-            self.load_module(module_path)
-        except Exception as e:
-            res.exception(e)
-            return res.error(f'error loading module "{module_name}"')
+        self.load_module(module_path)
+        await self.modules[module_name].execute_init()
+        log.info(f'module "{module_name}" created')
 
-        init_res = await self.modules[module_name].execute_init()
-        res += init_res
-
-        res.success(f'module "{module_name}" created')
-        res.ok = True
-        return res
-
-    async def clone_module(self, source: str | list[str]) -> Result:
-        res = Result()
-
+    async def clone_module(self, source: str | list[str]) -> None:
         sources = source if isinstance(source, list) else [source]
 
         for source in sources:
-            try:
-                source = str(source)
+            source = str(source)
 
-                if source.startswith(("git@", "http://", "https://")):
-                    name = await mutils.clone_from_git(source)
+            if source.startswith(("git@", "http://", "https://")):
+                name = await mutils.clone_from_git(source)
 
-                elif source.startswith("pimp://"):
-                    url = f"{REPOS_BASE_ADDR}/{source.removeprefix('pimp://')}"
-                    name = await mutils.clone_from_git(url)
+            elif source.startswith("pimp://"):
+                url = f"{REPOS_BASE_ADDR}/{source.removeprefix('pimp://')}"
+                name = await mutils.clone_from_git(url)
 
-                else:
-                    name = await mutils.clone_from_folder(Path(source))
+            else:
+                name = await mutils.clone_from_folder(Path(source))
 
-                parse_res = parse_module(MODULES_DIR / name)
-                res += parse_res
-                if parse_res.value:
-                    module = parse_res.value
-                else:
-                    continue
+            module = parse_module(MODULES_DIR / name)
 
-                if module.init:
-                    init_res = await module.execute_init()
-                    res += init_res
+            if module.init:
+                await module.execute_init()
 
-                for action in module.run:
-                    if isinstance(action, FileAction):
-                        target = Path(parse_string_vars(action.target))
-                        if target.exists():
-                            copy_path = f"{target}.bkp"
-                            try:
-                                shutil.copyfile(target, copy_path)
-                                res.info(
-                                    f'"{target.name}" copied to "{target.name}.bkp"'
-                                )
-                            except Exception as e:
-                                res.exception(
-                                    e, f'could not copy "{target}" to "{target}.bkp"'
-                                )
+            for action in module.run:
+                if isinstance(action, FileAction):
+                    target = Path(parse_string_vars(action.target))
+                    if target.exists():
+                        copy_path = f"{target}.bkp"
+                        shutil.copyfile(target, copy_path)
+                        log.info(f'"{target.name}" copied to "{target.name}.bkp"')
 
-                        link_path = Path(str(target) + ".j2")
-                        if link_path.exists() or link_path.is_symlink():
-                            res.info(
-                                f'skipping linking "{link_path}" to "{action.template}", destination already exists'
-                            )
-                            continue
+                    link_path = Path(str(target) + ".j2")
+                    if link_path.exists() or link_path.is_symlink():
+                        log.info(
+                            f'skipping linking "{link_path}" to "{action.template}", destination already exists'
+                        )
+                        continue
 
-                        link_path.parent.mkdir(exist_ok=True, parents=True)
-                        os.symlink(action.template, link_path)
-                        res.info(f'linked "{link_path}" to "{action.template}"')
+                    link_path.parent.mkdir(exist_ok=True, parents=True)
+                    os.symlink(action.template, link_path)
+                    log.info(f'linked "{link_path}" to "{action.template}"')
 
-                if res.errors:
-                    res.error(f'failed initializing module "{name}"')
-                    continue
+            self.modules[name] = module
+            log.info(f'module "{name}" cloned')
 
-                self.modules[name] = module
-                res.success(f'module "{name}" cloned')
-
-            except Exception as e:
-                res.exception(e)
-                continue
-
-        res.ok = True
-        return res
-
-    async def delete_module(self, module_name: str) -> Result:
-        res = Result()
-
+    async def delete_module(self, module_name: str) -> None:
         if module_name not in self.modules:
-            return res.error(f'module "{module_name}" not found')
+            raise Exception(f'module "{module_name}" not found')
 
         module = self.modules[module_name]
 
-        try:
-            await mutils.delete_module(module)
-        except Exception as e:
-            res.exception(e)
-        else:
-            self.modules.pop(module_name)
-            res.ok = True
-            res.success(f'module "{module_name}" deleted')
-        finally:
-            return res
+        await mutils.delete_module(module)
+        self.modules.pop(module_name)
 
-    async def list_modules(self) -> Result:
-        res = Result()
+        log.info(f'module "{module_name}" deleted')
 
+    async def list_modules(self) -> None:
         for module in self.modules:
-            res.info(module)
-
-        res.ok = True
-        return res
+            log.info(module)

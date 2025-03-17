@@ -1,13 +1,12 @@
+import logging
 from pathlib import Path
 from typing import Any, Union
 
 from pimpmyrice import files
-from pimpmyrice.logger import get_logger
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme, Wallpaper
-from pimpmyrice.utils import Result
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def parse_wallpaper(
@@ -45,34 +44,26 @@ def parse_theme(
     return theme
 
 
-def parse_module(module_path: Path) -> Result[Module]:
-    res: Result[Module] = Result()
-
+def parse_module(module_path: Path) -> Module:
     module_name = module_path.name
     module_yaml = module_path / "module.yaml"
     module_json = module_path / "module.json"
 
-    try:
-        if module_yaml.exists():
-            data = files.load_yaml(module_yaml)
-        elif module_json.exists():
-            data = files.load_json(module_json)
-        else:
-            return res
+    if module_yaml.exists():
+        data = files.load_yaml(module_yaml)
+    elif module_json.exists():
+        data = files.load_json(module_json)
+    else:
+        raise Exception("module.{json,yaml} not found")
 
-        for param in ["init", "pre_run", "run"]:
-            for action in data.get(param, []):
-                if isinstance(action, dict):
-                    action["module_name"] = module_name
+    for param in ["init", "pre_run", "run"]:
+        for action in data.get(param, []):
+            if isinstance(action, dict):
+                action["module_name"] = module_name
 
-        for cmd_name, cmd in data.get("commands", {}).items():
-            cmd["module_name"] = module_name
+    for cmd_name, cmd in data.get("commands", {}).items():
+        cmd["module_name"] = module_name
 
-        module = Module(**data, name=module_name)
+    module = Module(**data, name=module_name)
 
-        res.value = module
-
-    except Exception as e:
-        res.error(f'failed loading module in "{module_path}": {e}')
-    finally:
-        return res
+    return module

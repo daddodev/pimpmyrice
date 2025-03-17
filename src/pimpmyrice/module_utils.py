@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import logging
 import os
 import shlex
 import shutil
@@ -9,9 +10,10 @@ import subprocess
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Union
+from typing import TYPE_CHECKING, Any, Awaitable, Coroutine, Literal, Union
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -19,13 +21,49 @@ from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files, utils
 from pimpmyrice.config import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, Os
-from pimpmyrice.logger import get_logger
-from pimpmyrice.utils import AttrDict, Result, Timer, parse_string_vars
+from pimpmyrice.exceptions import IfCheckFailed
+from pimpmyrice.logger import current_module
+from pimpmyrice.utils import AttrDict, Timer, parse_string_vars
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
+
+
+class ModuleState(Enum):
+    PENDING = auto()
+    RUNNING = auto()
+    COMPLETED = auto()
+    FAILED = auto()
+    SKIPPED = auto()
+
+
+def module_context_wrapper(
+    module_name: str, modules_state: dict[str, ModuleState], coro: Awaitable[Any]
+) -> Coroutine[Any, Any, Any]:
+    """Wraps a coroutine in a context that sets the module name."""
+
+    async def wrapped() -> Any:
+        timer = Timer()
+        token = current_module.set(module_name)
+        modules_state[module_name] = ModuleState.RUNNING
+        try:
+            r = await coro
+            modules_state[module_name] = ModuleState.COMPLETED
+            log.info(f"done in {timer.elapsed():.2f} sec")
+            return r
+        except IfCheckFailed as e:
+            modules_state[module_name] = ModuleState.SKIPPED
+            log.debug(str(e))
+        except Exception as e:
+            modules_state[module_name] = ModuleState.FAILED
+            log.debug("exception:", exc_info=e)
+            log.error(str(e))
+        finally:
+            current_module.reset(token)
+
+    return wrapped()
 
 
 def add_action_type_to_schema(
@@ -50,44 +88,31 @@ class ShellAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "shell")
     )
 
-    async def run(self, theme_dict: AttrDict) -> Result:
-        res = Result()
+    async def run(self, theme_dict: AttrDict) -> None:
+        cmd = utils.parse_string_vars(
+            string=self.command,
+            module_name=self.module_name,
+            theme_dict=theme_dict,
+        )
 
-        try:
-            cmd = utils.parse_string_vars(
-                string=self.command,
-                module_name=self.module_name,
-                theme_dict=theme_dict,
+        if self.detached:
+            run_shell_command_detached(cmd)
+            log.debug(f'command "{cmd}" started in background')
+            return
+
+        r = await run_shell_command(cmd)
+
+        if r.returncode != 0:
+            raise Exception(
+                f'command "{cmd}" exited with code {r.returncode}\n'
+                f"stdout: {r.out}\n"
+                f"stderr: {r.err}"
             )
 
-            if self.detached:
-                run_shell_command_detached(cmd)
-                return res.debug(
-                    f'command "{cmd}" started in background', self.module_name
-                )
+        if r.err:
+            log.warning(f'command "{cmd}" returned errors:\n{r.err}')
 
-            r = await run_shell_command(cmd)
-
-            if r.returncode != 0:
-                res.error(f'command "{cmd}" exited with code {r.returncode}:')
-                res.error("stdout:", r.out)
-                res.error("stderr:", r.err)
-                return res
-
-            if r.err:
-                res.warning(
-                    f'command "{cmd}" returned errors:\n{r.err}', self.module_name
-                )
-
-            res.debug(
-                f'executed "{cmd}"',
-                self.module_name,
-            )
-            res.ok = True
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+        log.debug(f'executed "{cmd}"')
 
 
 class FileAction(BaseModel):
@@ -108,52 +133,41 @@ class FileAction(BaseModel):
             data["template"] = template_path
         return data
 
-    async def run(self, theme_dict: AttrDict, out_dir: Path | None = None) -> Result:
-        res = Result()
-
-        try:
-            template = Path(
-                utils.parse_string_vars(
-                    string=str(
-                        MODULES_DIR / self.module_name / "templates" / self.template
-                    ),
-                    module_name=self.module_name,
-                    theme_dict=theme_dict,
-                )
+    async def run(self, theme_dict: AttrDict, out_dir: Path | None = None) -> None:
+        template = Path(
+            utils.parse_string_vars(
+                string=str(
+                    MODULES_DIR / self.module_name / "templates" / self.template
+                ),
+                module_name=self.module_name,
+                theme_dict=theme_dict,
             )
-            target = Path(
-                utils.parse_string_vars(
-                    string=self.target,
-                    module_name=self.module_name,
-                    theme_dict=theme_dict,
-                )
+        )
+        target = Path(
+            utils.parse_string_vars(
+                string=self.target,
+                module_name=self.module_name,
+                theme_dict=theme_dict,
             )
+        )
 
-            if out_dir:
-                if target.is_relative_to(HOME_DIR):
-                    target = out_dir / target.relative_to(HOME_DIR)
-                else:
-                    target = out_dir / target
+        if out_dir:
+            if target.is_relative_to(HOME_DIR):
+                target = out_dir / target.relative_to(HOME_DIR)
+            else:
+                target = out_dir / target
 
-            if not target.parent.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.parent.exists():
+            target.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(template, "r", encoding="utf-8") as f:
-                data = f.read()
-            processed_data = utils.process_template(data, theme_dict)
+        with open(template, "r", encoding="utf-8") as f:
+            data = f.read()
+        processed_data = utils.process_template(data, theme_dict)
 
-            with open(target, "w", encoding="utf-8") as f:
-                f.write(processed_data)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(processed_data)
 
-            res.debug(
-                f'generated "{target}"',
-                self.module_name,
-            )
-            res.ok = True
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+        log.debug(f'generated "{target}"')
 
 
 class PythonAction(BaseModel):
@@ -166,62 +180,45 @@ class PythonAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "python")
     )
 
-    async def run(self, *args: Any, **kwargs: Any) -> Result[Any]:
+    async def run(self, *args: Any, **kwargs: Any) -> Any:
         file_path = Path(self.py_file_path)
 
         if not file_path.is_absolute():
             file_path = MODULES_DIR / self.module_name / file_path
 
-        res = Result()
+        fn = get_func_from_py_file(file_path, self.function_name)
 
-        try:
-            fn = get_func_from_py_file(file_path, self.function_name)
+        log.debug(f"{file_path}:{self.function_name} loaded")
 
-            res.debug(
-                f"{file_path}:{self.function_name} loaded",
-                self.module_name,
-            )
+        res = await fn(*args, **kwargs)
 
-            if asyncio.iscoroutinefunction(fn):
-                res.value = await fn(*args, **kwargs)
-            else:
-                res.value = fn(*args, **kwargs)
+        log.debug(f"{file_path.name}:{self.function_name} returned:\n{res}")
 
-            res.debug(
-                f"{file_path.name}:{self.function_name} returned:\n{res.value}",
-                self.module_name,
-            )
-            res.ok = True
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+        return res
 
 
 class WaitForAction(BaseModel):
     action: Literal["wait_for"] = Field(default="wait_for")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     module: str
+    timeout: int = 3
 
     model_config = ConfigDict(
         json_schema_extra=partial(add_action_type_to_schema, "wait_for")
     )
 
-    async def run(self, _: AttrDict, modules_state: dict[str, Any]) -> Result:
-        res = Result()
-
-        try:
-            res.debug(f'waiting for module "{self.module}"...')
-            # TODO add timeout
-            while not modules_state[self.module]["done"]:
-                await asyncio.sleep(0.1)
-            res.debug(f'done waiting for module "{self.module}"')
-            res.ok = True
-
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+    async def run(self, _: AttrDict, modules_state: dict[str, Any]) -> None:
+        log.debug(f'waiting for module "{self.module}"...')
+        timer = Timer()
+        while modules_state[self.module] in [ModuleState.PENDING, ModuleState.RUNNING]:
+            if timer.elapsed() > self.timeout:
+                log.error(
+                    f'waiting for module "{self.module}" timed out (>{self.timeout} sec)'
+                )
+                break
+            await asyncio.sleep(0.05)
+        else:
+            log.debug(f'done waiting for module "{self.module}"')
 
     def __str__(self) -> str:
         return f'wait for "{self.module}" to finish'
@@ -237,19 +234,10 @@ class IfRunningAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "if_running")
     )
 
-    async def run(self, _: AttrDict) -> Result:
-        res = Result()
-
-        try:
-            running = utils.is_process_running(self.program_name)
-            if self.should_be_running:
-                res.ok = running
-            else:
-                res.ok = not running
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+    async def run(self, _: AttrDict) -> None:
+        running = utils.is_process_running(self.program_name)
+        if self.should_be_running != running:
+            raise IfCheckFailed(f"{self.__str__()} returned false")
 
     def __str__(self) -> str:
         return f'if "{self.program_name}" {"running" if self.should_be_running else "not running"}'
@@ -265,9 +253,7 @@ class LinkAction(BaseModel):
         json_schema_extra=partial(add_action_type_to_schema, "link")
     )
 
-    async def run(self) -> Result:
-        res = Result()
-
+    async def run(self) -> None:
         origin_path = Path(parse_string_vars(self.origin, module_name=self.module_name))
         destination_path = Path(
             parse_string_vars(self.destination, module_name=self.module_name)
@@ -277,23 +263,17 @@ class LinkAction(BaseModel):
             origin_path = MODULES_DIR / self.module_name / "files" / origin_path
 
         if destination_path.exists():
-            return res.error(
+            raise Exception(
                 f'cannot link destination "{destination_path}" to origin "{origin_path}", destination already exists'
             )
-        try:
-            destination_path.parent.mkdir(parents=True, exist_ok=True)
-            os.symlink(
-                origin_path,
-                destination_path,
-                target_is_directory=origin_path.is_dir(),
-            )
-            # action.destination.hardlink_to(action.origin)
-            res.info(f'init: "{destination_path}" linked to "{origin_path}"')
-            res.ok = True
-        except Exception as e:
-            res.exception(e, self.module_name)
-        finally:
-            return res
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        os.symlink(
+            origin_path,
+            destination_path,
+            target_is_directory=origin_path.is_dir(),
+        )
+        # action.destination.hardlink_to(action.origin)
+        log.info(f'init: "{destination_path}" linked to "{origin_path}"')
 
 
 ModuleInit = Union[LinkAction]
@@ -317,65 +297,31 @@ class Module(BaseModel):
 
     async def execute_command(
         self, command_name: str, tm: ThemeManager, *args: Any, **kwargs: Any
-    ) -> Result:
-        res = Result()
-
+    ) -> None:
         if command_name not in self.commands:
-            return res.error(
+            raise Exception(
                 f'command "{command_name}" not found in [{", ".join(self.commands.keys())}]'
             )
 
-        try:
-            action_res = await self.commands[command_name].run(tm=tm, *args, **kwargs)
-        except Exception as e:
-            return res.exception(
-                e, f'command "{command_name}" encountered an error:', self.name
-            )
+        await self.commands[command_name].run(tm=tm, *args, **kwargs)
 
-        res += action_res
-        return res
-
-    async def execute_init(self) -> Result:
-        res = Result()
-
+    async def execute_init(self) -> None:
         for action in self.init:
-            try:
-                action_res = await action.run()
-                res += action_res
-                if not action_res.ok:
-                    break
+            await action.run()
 
-            except Exception as e:
-                res.exception(e, f"{action} encountered an error:", self.name)
-                break
+    async def execute_pre_run(self, theme_dict: AttrDict) -> AttrDict:
+        for action in self.pre_run:
+            action_res = await action.run(theme_dict)
+            theme_dict = action_res
 
-        return res
-
-    async def execute_pre_run(self, theme_dict: AttrDict) -> Result[AttrDict]:
-        res: Result[AttrDict] = Result()
-
-        try:
-            for action in self.pre_run:
-                action_res = await action.run(theme_dict)
-                res += action_res
-                if action_res.value:
-                    theme_dict = action_res.value
-
-        except Exception as e:
-            res.exception(e, self.name)
-        finally:
-            res.value = theme_dict
-            return res
+        return theme_dict
 
     async def execute_run(
         self,
         theme_dict: AttrDict,
         modules_state: dict[str, Any],
         out_dir: Path | None = None,
-    ) -> Result:
-        res = Result(name=self.name)
-        timer = Timer()
-
+    ) -> None:
         # get_module_dict
         theme_dict = (
             theme_dict + theme_dict["modules_styles"][self.name]
@@ -387,41 +333,17 @@ class Module(BaseModel):
         if out_dir:
             for action in self.run:
                 if isinstance(action, FileAction):
-                    try:
-                        action_res = await action.run(theme_dict, out_dir=out_dir)
-                    except Exception as e:
-                        res.exception(e, f"{action} encountered an error:", self.name)
-                        break
-
-                    res += action_res
-                    if not action_res.ok:
-                        res.debug(f"interrupted because res.ok is false:\n{action_res}")
-                        break
+                    # TODO other actions
+                    await action.run(theme_dict, out_dir=out_dir)
                 else:
-                    res.debug(f"dumping {action} not implemented, skipping")
-
-            return res
+                    log.warning(f"dumping {action} not implemented, skipping")
+            return
 
         for action in self.run:
-            try:
-                if isinstance(action, WaitForAction):
-                    action_res = await action.run(theme_dict, modules_state)
-                else:
-                    action_res = await action.run(theme_dict)
-
-                res += action_res
-                if not action_res.ok:
-                    res.debug(f"interrupted because res.ok is false:\n{action_res}")
-                    break
-
-            except Exception as e:
-                res.exception(e, f"{action} encountered an error:", self.name)
-                break
-
-        res.time = timer.elapsed()
-        res.info(f"done in {res.time:.2f} sec", self.name)
-        res.ok = True
-        return res
+            if isinstance(action, WaitForAction):
+                await action.run(theme_dict, modules_state)
+            else:
+                await action.run(theme_dict)
 
 
 def get_func_from_py_file(py_file: Path, func_name: str) -> Any:

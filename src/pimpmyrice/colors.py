@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import colorsys
+import logging
 import re
 from pathlib import Path
 from typing import Any, Callable, Literal
@@ -11,9 +12,8 @@ from pydantic_core import CoreSchema, core_schema
 
 from pimpmyrice import files
 from pimpmyrice.config import PALETTES_DIR
-from pimpmyrice.logger import get_logger
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 class Color:

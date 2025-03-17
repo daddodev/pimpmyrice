@@ -1,4 +1,5 @@
 import json
+import logging
 import mimetypes
 import os
 import shutil
@@ -20,10 +21,8 @@ from pimpmyrice.config import (
     TEMP_DIR,
     THEMES_DIR,
 )
-from pimpmyrice.logger import get_logger
-from pimpmyrice.utils import Result
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def load_yaml(file: Path) -> dict[str, Any]:
@@ -83,7 +82,7 @@ def import_image(image_path: Path, theme_dir: Path) -> Path:
         raise Exception(f'file already exists at "{dest}"')
 
     shutil.copy(image_path, theme_dir)
-    log.debug(f'image "{image_path.name}" imported')
+    log.debug(f'image "{image_path}" copied to {dest}')
     return dest
 
 
@@ -115,48 +114,37 @@ def create_config_dirs() -> None:
     #     create_venv()
 
 
-def download_file(url: str, destination: Path = TEMP_DIR) -> Result[Path]:
+def download_file(url: str, destination: Path = TEMP_DIR) -> Path:
     # TODO better filename
 
-    res = Result[Path]()
+    import requests
 
-    try:
-        import requests
+    response = requests.get(url, stream=True)
 
-        response = requests.get(url, stream=True)
-
-        if response.status_code != 200:
-            return res.error(
-                f"Failed to download image. Status code: {response.status_code}"
-            )
-
-        content_type = response.headers.get("content-type")
-        file_extension = (
-            mimetypes.guess_extension(content_type) if content_type else None
+    if response.status_code != 200:
+        raise Exception(
+            f"Failed to download image. Status code: {response.status_code}"
         )
 
-        if not file_extension:
-            file_extension = ".jpg"
+    content_type = response.headers.get("content-type")
+    file_extension = mimetypes.guess_extension(content_type) if content_type else None
 
-        filename = url.split("/")[-1].split("?")[0]
+    if not file_extension:
+        file_extension = ".jpg"
 
-        if not filename.endswith(file_extension):
-            filename = filename + file_extension
+    filename = url.split("/")[-1].split("?")[0]
 
-        save_path = destination / filename
+    if not filename.endswith(file_extension):
+        filename = filename + file_extension
 
-        tries = 1
-        while save_path.exists():
-            save_path = (
-                save_path.parent / f"{save_path.stem}_{tries + 1}{save_path.suffix}"
-            )
+    save_path = destination / filename
 
-        with open(save_path, "wb") as file:
-            for chunk in response.iter_content(chunk_size=8192):
-                file.write(chunk)
+    tries = 1
+    while save_path.exists():
+        save_path = save_path.parent / f"{save_path.stem}_{tries + 1}{save_path.suffix}"
 
-        res.value = save_path
-        return res
+    with open(save_path, "wb") as file:
+        for chunk in response.iter_content(chunk_size=8192):
+            file.write(chunk)
 
-    except Exception as e:
-        return res.exception(e)
+    return save_path

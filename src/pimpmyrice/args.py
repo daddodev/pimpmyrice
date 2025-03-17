@@ -1,17 +1,14 @@
+import logging
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-from pimpmyrice.logger import get_logger
 from pimpmyrice.theme import ThemeManager
-from pimpmyrice.utils import Result
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
-async def process_args(tm: ThemeManager, args: dict[str, Any]) -> Result:
-    res = Result()
-
+async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
     options = {
         "mode_name": args["--mode"],
         "palette_name": args["--palette"],
@@ -43,62 +40,77 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> Result:
             options["include_tags"] = tags
         if exclude_tags:
             options["exclude_tags"] = exclude_tags
-        return await tm.set_random_theme(**options)
+        await tm.set_random_theme(**options)
+        return
 
     elif args["refresh"]:
-        return await tm.apply_theme(**options)
+        await tm.apply_theme(**options)
+        return
 
     elif args["theme"]:
         if args["set"]:
-            return await tm.apply_theme(theme_name=args["THEME"], **options)
+            await tm.apply_theme(theme_name=args["THEME"], **options)
+            return
 
         elif args["rename"]:
-            return await tm.rename_theme(
+            await tm.rename_theme(
                 theme_name=args["THEME"],
                 new_name=args["NEW_NAME"],
             )
+            return
 
         elif args["delete"]:
-            return tm.delete_theme(args["THEME"])
+            tm.delete_theme(args["THEME"])
+            return
         elif args["export"]:
-            return await tm.export_theme(
+            await tm.export_theme(
                 args["THEME"], out_dir=Path(args["OUT_DIR"]).absolute(), **options
             )
+            return
 
     elif args["module"]:
         if args["clone"]:
-            return await tm.mm.clone_module(args["MODULE_URL"])
+            await tm.mm.clone_module(args["MODULE_URL"])
+            return
 
         elif args["create"]:
-            return await tm.mm.create_module(args["MODULE_NAME"])
+            await tm.mm.create_module(args["MODULE_NAME"])
+            return
 
         elif args["delete"]:
-            return await tm.mm.delete_module(args["MODULE"])
+            await tm.mm.delete_module(args["MODULE"])
+            return
 
         elif args["run"]:
-            return await tm.mm.run_module_command(
+            await tm.mm.run_module_command(
                 tm,
                 module_name=args["MODULE"],
                 command=args["COMMAND"],
                 cmd_args=args["COMMAND_ARGS"],
             )
+            return
 
         elif args["reinit"]:
-            return await tm.mm.init_module(module_name=args["MODULE"])
+            await tm.mm.init_module(module_name=args["MODULE"])
+            return
 
     elif args["tags"]:
         if args["add"]:
-            return await tm.add_tags(args["THEMES"], tags)
+            await tm.add_tags(args["THEMES"], tags)
+            return
         elif args["remove"]:
-            return await tm.remove_tags(args["THEMES"], tags)
+            await tm.remove_tags(args["THEMES"], tags)
+            return
 
     elif args["toggle"]:
-        return await tm.toggle_mode()
+        await tm.toggle_mode()
+        return
 
     elif args["mode"]:
         mode = args["MODE"]
 
-        return await tm.set_mode(mode)
+        await tm.set_mode(mode)
+        return
 
     elif args["gen"]:
         a = {}
@@ -113,22 +125,25 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> Result:
             a["apply"] = apply
 
         for img in args["IMAGE"]:
-            r = await tm.generate_theme(image=img, **a)
-            res += r
-
-        return res
+            await tm.generate_theme(image=img, **a)
+        return
 
     elif args["list"]:
         if args["modules"]:
-            return await tm.mm.list_modules()
+            await tm.mm.list_modules()
+            return
         elif args["themes"]:
-            return await tm.list_themes()
+            await tm.list_themes()
+            return
         elif args["tags"]:
-            return await tm.list_tags()
+            await tm.list_tags()
+            return
         elif args["palettes"]:
-            return await tm.list_palettes()
+            await tm.list_palettes()
+            return
         elif args["styles"]:
-            return await tm.list_styles()
+            await tm.list_styles()
+            return
 
     elif args["info"]:
         # TODO use Rich Table?
@@ -137,15 +152,19 @@ name: {tm.config.theme}
 mode: {tm.config.mode}
 """
 
-        return res.info(msg)
+        log.info(msg)
+        return
 
     elif args["regen"]:
-        return await tm.rewrite_themes(regen_colors=True, name_includes=args["--name"])
+        await tm.rewrite_themes(regen_colors=True, name_includes=args["--name"])
+        return
 
     elif args["rewrite"]:
         if args["themes"]:
-            return await tm.rewrite_themes(name_includes=args["--name"])
+            await tm.rewrite_themes(name_includes=args["--name"])
+            return
         elif args["modules"]:
-            return await tm.mm.rewrite_modules(name_includes=args["--name"])
+            await tm.mm.rewrite_modules(name_includes=args["--name"])
+            return
 
-    return res.error("not implemented")
+    log.error("not implemented")

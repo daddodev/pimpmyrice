@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import subprocess
@@ -22,12 +23,12 @@ from docopt import (
 
 from pimpmyrice.config import HOME_DIR
 from pimpmyrice.doc import __doc__ as cli_doc
-from pimpmyrice.logger import get_logger
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
-log = get_logger(__name__)
+
+log = logging.getLogger(__name__)
 
 # FROM infi.docopt_completion https://github.com/Infinidat/infi.docopt_completion
 

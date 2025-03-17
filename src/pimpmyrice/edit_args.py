@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -11,9 +12,8 @@ from pimpmyrice.config import (
     THEMES_DIR,
 )
 from pimpmyrice.files import load_json
-from pimpmyrice.logger import get_logger
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 async def process_edit_args(args: dict[str, Any]) -> None:

@@ -26,20 +26,14 @@ def tm() -> ThemeManager:
 
 @pytest.mark.asyncio(scope="session")
 async def test_clone_module(tm: ThemeManager) -> None:
-    res = await tm.mm.clone_module("pimp://alacritty")
-    print(res)
-    assert res.ok
+    await tm.mm.clone_module("pimp://alacritty")
 
 
 @pytest.mark.asyncio(scope="session")
 async def test_gen_theme(tm: ThemeManager) -> None:
-    res = await tm.generate_theme("./tests/example.jpg")
-    print(res)
-    assert res.ok
+    await tm.generate_theme("./tests/example.jpg")
 
 
 @pytest.mark.asyncio(scope="session")
 async def test_set_random_theme(tm: ThemeManager) -> None:
-    res = await tm.set_random_theme()
-    print(res)
-    assert res.ok
+    await tm.set_random_theme()

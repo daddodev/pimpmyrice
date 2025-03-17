@@ -8,10 +8,9 @@ from docopt import DocoptExit, docopt
 from pimpmyrice.config import SERVER_PID_FILE
 from pimpmyrice.doc import __doc__ as cli_doc
 from pimpmyrice.edit_args import process_edit_args
-from pimpmyrice.logger import LogLevel, get_logger
 from pimpmyrice.utils import is_locked
 
-log = get_logger(__name__)
+log = logging.getLogger(__name__)
 
 
 def send_to_server(
@@ -42,14 +41,11 @@ def send_to_server(
                 for chunk in response.iter_lines():
                     parsed = json.loads(chunk)["data"]
                     try:
-                        log.log(LogLevel[parsed["level"]].value, parsed["msg"])
+                        log.log(
+                            logging.getLevelName(parsed["level"].upper()), parsed["msg"]
+                        )
                     except Exception as e:
                         log.exception(e)
-
-        # res_json = json.loads(response.json())
-        #
-        # for record in res_json["result"]["records"]:
-        #     log.log(LogLevel[record["level"]].value, record["msg"])
 
     except Exception as e:
         log.exception(e)
@@ -73,11 +69,15 @@ async def cli() -> None:
 
     server_running, server_pid = is_locked(SERVER_PID_FILE)
 
-    if server_running:
-        send_to_server(args)
-    else:
-        from pimpmyrice.args import process_args
-        from pimpmyrice.theme import ThemeManager
+    try:
+        if server_running:
+            send_to_server(args)
+        else:
+            from pimpmyrice.args import process_args
+            from pimpmyrice.theme import ThemeManager
 
-        tm = ThemeManager()
-        await process_args(tm, args)
+            tm = ThemeManager()
+            await process_args(tm, args)
+    except Exception as e:
+        log.debug("exception:", exc_info=e)
+        log.error(e)
