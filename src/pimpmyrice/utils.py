@@ -12,6 +12,7 @@ import psutil
 from typing_extensions import TypeVar
 
 from pimpmyrice.config import CONFIG_DIR, HOME_DIR, MODULES_DIR
+from pimpmyrice.exceptions import ReferenceNotFound
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +67,23 @@ def process_template(template: str, values: dict[str, Any]) -> str:
     templ = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(template)
     rendered: str = templ.render(**values)
     return rendered
+
+
+def process_keyword_template(value: str, theme_map: dict[str, Any]) -> Any:
+    output: list[Any] = []
+
+    def capture_j2_var(v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("{{") and v.endswith("}}"):
+            raise ReferenceNotFound(f'reference for "{v}" not found')
+        output.append(v)
+
+    template_str = "{%- set parsed = " + value[2:-2] + "-%} {{capture_j2_var(parsed)}}"
+    templ = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(
+        template_str
+    )
+    templ.render(capture_j2_var=capture_j2_var, **theme_map)
+
+    return output[0]
 
 
 def parse_string_vars(

@@ -275,10 +275,12 @@ class ThemeManager:
                 raise Exception("No current theme")
             theme_name = self.config.theme
         elif theme_name not in self.themes:
-            raise Exception(f'"{theme_name}" not found')
+            raise Exception(f'theme "{theme_name}" not found')
 
         if not mode_name:
             mode_name = self.config.mode
+
+        log.info(f'applying theme "{theme_name}" {mode_name}...')
 
         try:
             theme_dict = tutils.gen_theme_dict(
@@ -295,8 +297,6 @@ class ThemeManager:
         if print_theme_dict:
             pretty = rich.pretty.pretty_repr(theme_dict)
             log.info("generated theme_dict:\r\n" + pretty)
-
-        log.info(f'applying theme "{theme_name}"...')
 
         await self.mm.run_modules(theme_dict, include_modules, exclude_modules)
 

@@ -8,16 +8,23 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Tuple
 
+from jinja2 import UndefinedError
 from pydantic import BaseModel, Field, computed_field, validator
 from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
-from pimpmyrice.colors import Color, LinkPalette, Palette
+from pimpmyrice.colors import LinkPalette, Palette
 from pimpmyrice.config import PALETTE_GENERATORS_DIR
 from pimpmyrice.dark_generator import gen_palette as dark_generator
+from pimpmyrice.exceptions import ReferenceNotFound
 from pimpmyrice.light_generator import gen_palette as light_generator
 from pimpmyrice.module_utils import get_func_from_py_file
-from pimpmyrice.utils import AttrDict, DictOrAttrDict, get_thumbnail
+from pimpmyrice.utils import (
+    AttrDict,
+    DictOrAttrDict,
+    get_thumbnail,
+    process_keyword_template,
+)
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
@@ -174,27 +181,12 @@ def resolve_refs(
             data[key], pending = resolve_refs(value, theme_dict)
             for p in pending:
                 unresolved.append(f"{key}.{p}")
-        elif isinstance(value, str) and value.startswith("$"):
-            ref = value[1:]
-
-            ref_slices = ref.split(".")
-            d = theme_dict
-
-            while len(ref_slices) > 1:
-                if ref_slices[0] in d:
-                    d = d[ref_slices[0]]
-                else:
-                    unresolved.append(key)
-                    break
-                ref_slices.pop(0)
-
-            if isinstance(d, Color):
-                res = getattr(d, ref_slices[0])
-                data[key] = Color(res)
-            elif ref_slices[0] in d and not str(d[ref_slices[0]]).startswith("$"):
-                data[key] = d[ref_slices[0]]
-            else:
-                unresolved.append(key)
+        elif isinstance(value, str) and value.startswith("{{") and value.endswith("}}"):
+            try:
+                processed = process_keyword_template(value, theme_dict)
+                data[key] = processed
+            except (ReferenceNotFound, UndefinedError):
+                unresolved.append(f"{key}: {value}")
 
     return data, unresolved
 
