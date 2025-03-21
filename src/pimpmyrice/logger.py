@@ -26,21 +26,22 @@ class ModuleFormatter(logging.Formatter):
 
 
 def serialize_logrecord(log_record: logging.LogRecord) -> str:
+    msg = log_record.getMessage()
+    if log_record.exc_info:
+        msg += "\r\ncheck server logs for more information"
+
     log_dict = {
         "name": log_record.name,
         "level": log_record.levelno,
         "pathname": log_record.pathname,
         "lineno": log_record.lineno,
-        "msg": log_record.getMessage(),
+        "msg": msg,
         "func": log_record.funcName,
         "sinfo": log_record.stack_info,
         "module_name": log_record.module_name
         if hasattr(log_record, "module_name")
         else None,
     }
-
-    if log_record.exc_info:
-        log_dict["msg"] = f"{log_dict["msg"]}\r\ncheck server logs for more information"
 
     return json.dumps(log_dict)
 
