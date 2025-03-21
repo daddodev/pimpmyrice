@@ -2,7 +2,7 @@ _This project is currently in beta and may be subject to breaking changes._
 
 # 🍙 PimpMyRice
 
-### The overkill rice manager
+### The overkill theme manager
 
 [📄 Documentation](https://pimpmyrice.vercel.app/docs) ║ [📦 Starter Modules](https://pimpmyrice.vercel.app/modules) ║ [💬 Discord](https://discord.gg/TDrSB2wk6c)
 
