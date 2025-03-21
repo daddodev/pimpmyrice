@@ -1,4 +1,3 @@
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -8,6 +7,7 @@ from docopt import DocoptExit, docopt
 from pimpmyrice.config import SERVER_PID_FILE
 from pimpmyrice.doc import __doc__ as cli_doc
 from pimpmyrice.edit_args import process_edit_args
+from pimpmyrice.logger import deserialize_logrecord
 from pimpmyrice.utils import is_locked
 
 log = logging.getLogger(__name__)
@@ -38,14 +38,10 @@ def send_to_server(
             f"{address}/v1/cli_command", json=args, stream=True
         ) as response:
             if response.status_code == 200:
-                for chunk in response.iter_lines():
-                    parsed = json.loads(chunk)["data"]
-                    try:
-                        log.log(
-                            logging.getLevelName(parsed["level"].upper()), parsed["msg"]
-                        )
-                    except Exception as e:
-                        log.exception(e)
+                for chunk in response.iter_content(chunk_size=8192):
+                    log_record = deserialize_logrecord(chunk.decode())
+                    if log_record.levelno >= log.getEffectiveLevel():
+                        log.handle(log_record)
 
     except Exception as e:
         log.exception(e)
