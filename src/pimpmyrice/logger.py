@@ -40,7 +40,7 @@ def serialize_logrecord(log_record: logging.LogRecord) -> str:
     }
 
     if log_record.exc_info:
-        log_dict["msg"] += "\r\ncheck server logs for more information"
+        log_dict["msg"] = f"{log_dict["msg"]}\r\ncheck server logs for more information"
 
     return json.dumps(log_dict)
 
