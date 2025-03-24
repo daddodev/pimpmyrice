@@ -42,8 +42,6 @@ class ModuleState(Enum):
 def module_context_wrapper(
     module_name: str, modules_state: dict[str, ModuleState], coro: Awaitable[Any]
 ) -> Coroutine[Any, Any, Any]:
-    """Wraps a coroutine in a context that sets the module name."""
-
     async def wrapped() -> Any:
         timer = Timer()
         token = current_module.set(module_name)

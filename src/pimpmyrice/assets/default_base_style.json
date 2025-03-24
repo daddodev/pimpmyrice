@@ -1,24 +1,50 @@
 {
     "bar": {
-        "bg": "$panel.bg",
-        "fg": "$panel.fg"
+        "bg": "{{panel.bg}}",
+        "fg": "{{panel.fg}}"
+    },
+    "panel": {
+        "bg": "{{normal.bg}}",
+        "fg": "{{normal.bg.contrasting().adjusted(max_sat=20)}}"
+    },
+    "dialog": {
+        "bg": "{{normal.bg}}",
+        "fg": "{{normal.bg.contrasting().adjusted(max_sat=20)}}"
+    },
+    "input": {
+        "bg": "{{primary.bg}}",
+        "fg": "{{primary.bg.contrasting()}}"
+    },
+    "muted": {
+        "bg": "{{normal.bg.adjusted(max_sat=40, val=('+60'if 'dark' in mode else '-40'))}}",
+        "fg": "{{normal.bg.adjusted(max_sat=40, val=('+60'if 'dark' in mode else '-40')).contrasting()}}"
+    },
+    "accent": {
+        "bg": "{{primary.bg}}",
+        "fg": "{{primary.bg.contrasting()}}"
+    },
+    "destructive": {
+        "bg": "{{secondary.bg}}",
+        "fg": "{{secondary.bg.contrasting()}}"
+    },
+    "border": {
+        "active": "{{primary.bg}}",
+        "inactive": "{{normal.bg.adjusted(val='+10')}}",
+        "radius": 15,
+        "width": 4
     },
     "blur": {
         "enabled": true,
         "passes": 3,
         "strength": 7
     },
-    "border": {
-        "radius": 0,
-        "width": 3
-    },
     "font": {
         "normal": {
-            "family": "sans-serif",
+            "family": "DejaVu Sans",
             "size": 12
         },
         "mono": {
-            "family": "monospace",
+            "family": "JetBrainsMono Nerd Font",
             "size": 10
         }
     },
@@ -37,20 +63,21 @@
     },
     "shadow": {
         "enabled": true,
-        "offset": 10,
-        "opacity": 0.4,
+        "offset": 0,
         "blur": 10,
-        "spread": 10
+        "spread": 10,
+        "color": "0, 0, 0",
+        "opacity": 0.4
     },
     "titlebar": {
-        "enabled": true,
+        "enabled": false,
         "active": {
-            "bg": "$border.active",
-            "fg": "$primary.fg"
+            "bg": "{{border.active}}",
+            "fg": "{{primary.fg}}"
         },
         "inactive": {
-            "bg": "$border.inactive",
-            "fg": "$normal.fg"
+            "bg": "{{border.inactive}}",
+            "fg": "{{primary.fg}}"
         }
     },
     "animations": {

@@ -19,7 +19,6 @@ async def gen_palette(image_path: Path) -> Palette:
     # TODO contrast with normal
     primary = by_vibrancy[0].adjusted(min_sat=50, max_val=40)
     secondary = by_vibrancy[1].adjusted(min_sat=50, max_val=40)
-    muted = normal.adjusted(max_sat=40, val="-40")
 
     term: dict[str, Color] = {}
 
@@ -43,15 +42,8 @@ async def gen_palette(image_path: Path) -> Palette:
     palette = {
         "term": term,
         "normal": {"bg": normal, "fg": normal.contrasting().adjusted(max_sat=20)},
-        "panel": {"bg": normal, "fg": normal.contrasting().adjusted(max_sat=20)},
-        "dialog": {"bg": normal, "fg": normal.contrasting().adjusted(max_sat=20)},
-        "input": {"bg": primary, "fg": primary.contrasting()},
-        "muted": {"bg": muted, "fg": muted.contrasting()},
         "primary": {"bg": primary, "fg": primary.contrasting()},
         "secondary": {"bg": secondary, "fg": secondary.contrasting()},
-        "accent": {"bg": primary, "fg": primary.contrasting()},
-        "destructive": {"bg": secondary, "fg": secondary.contrasting()},
-        "border": {"active": primary, "inactive": normal.adjusted(val="-10")},
     }
 
     p = Palette(**palette)  # type: ignore

@@ -293,15 +293,8 @@ class BgFgColors(BaseModel):
 class Palette(BaseModel):
     term: TermColors
     normal: BgFgColors
-    panel: BgFgColors
-    dialog: BgFgColors
-    input: BgFgColors
-    muted: BgFgColors
     primary: BgFgColors
     secondary: BgFgColors
-    accent: BgFgColors
-    destructive: BgFgColors
-    border: dict[Literal["active"] | Literal["inactive"], Color]
 
 
 class LinkPalette(BaseModel):
