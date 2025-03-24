@@ -4,7 +4,7 @@ import colorsys
 import logging
 import re
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable
 
 from pydantic import BaseModel, Field, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue, SkipJsonSchema
