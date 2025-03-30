@@ -21,7 +21,7 @@ from docopt import (
     printable_usage,
 )
 
-from pimpmyrice.config import HOME_DIR
+from pimpmyrice.config_paths import HOME_DIR
 from pimpmyrice.doc import __doc__ as cli_doc
 
 if TYPE_CHECKING:

@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field, GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue, SkipJsonSchema
 from pydantic_core import CoreSchema, core_schema
 
-from pimpmyrice import files
-from pimpmyrice.config import PALETTES_DIR
+from pimpmyrice.config_paths import PALETTES_DIR
+from pimpmyrice.files import load_json
 
 log = logging.getLogger(__name__)
 
@@ -310,7 +310,7 @@ def get_palettes() -> dict[str, GlobalPalette]:
     palettes = {}
     for file in PALETTES_DIR.iterdir():
         try:
-            palette = files.load_json(file)
+            palette = load_json(file)
             palettes[file.stem] = GlobalPalette(name=file.stem, path=file, **palette)
         except Exception as e:
             log.exception(e)

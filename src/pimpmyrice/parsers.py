@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import Any, Union
 
-from pimpmyrice import files
+from pimpmyrice.files import load_json, load_yaml
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme, Wallpaper
 
@@ -26,7 +26,7 @@ def parse_theme(
 ) -> Theme:
     name = path.name
 
-    data = files.load_json(path / "theme.json")
+    data = load_json(path / "theme.json")
 
     data["wallpaper"] = parse_wallpaper(data["wallpaper"], path)
 
@@ -50,9 +50,9 @@ def parse_module(module_path: Path) -> Module:
     module_json = module_path / "module.json"
 
     if module_yaml.exists():
-        data = files.load_yaml(module_yaml)
+        data = load_yaml(module_yaml)
     elif module_json.exists():
-        data = files.load_json(module_json)
+        data = load_json(module_json)
     else:
         raise Exception("module.{json,yaml} not found")
 

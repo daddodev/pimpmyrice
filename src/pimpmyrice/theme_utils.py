@@ -14,17 +14,13 @@ from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
 from pimpmyrice.colors import LinkPalette, Palette
-from pimpmyrice.config import PALETTE_GENERATORS_DIR
-from pimpmyrice.dark_generator import gen_palette as dark_generator
+from pimpmyrice.config_paths import PALETTE_GENERATORS_DIR
 from pimpmyrice.exceptions import ReferenceNotFound
-from pimpmyrice.light_generator import gen_palette as light_generator
 from pimpmyrice.module_utils import get_func_from_py_file
-from pimpmyrice.utils import (
-    AttrDict,
-    DictOrAttrDict,
-    get_thumbnail,
-    process_keyword_template,
-)
+from pimpmyrice.palette_generators.dark import gen_palette as dark_generator
+from pimpmyrice.palette_generators.light import gen_palette as light_generator
+from pimpmyrice.template import process_keyword_template
+from pimpmyrice.utils import AttrDict, DictOrAttrDict, get_thumbnail
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager

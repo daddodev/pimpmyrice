@@ -4,7 +4,7 @@ from typing import Any
 
 from docopt import DocoptExit, docopt
 
-from pimpmyrice.config import SERVER_PID_FILE
+from pimpmyrice.config_paths import SERVER_PID_FILE
 from pimpmyrice.doc import __doc__ as cli_doc
 from pimpmyrice.edit_args import process_edit_args
 from pimpmyrice.logger import deserialize_logrecord

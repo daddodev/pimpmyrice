@@ -10,7 +10,7 @@ from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
-from pimpmyrice.config import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
+from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.events import EventHandler
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
 from pimpmyrice.module import ModuleManager

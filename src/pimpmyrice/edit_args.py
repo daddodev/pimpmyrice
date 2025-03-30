@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pimpmyrice.config import (
+from pimpmyrice.config_paths import (
     BASE_STYLE_FILE,
     CONFIG_FILE,
     MODULES_DIR,

@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from pimpmyrice import assets
-from pimpmyrice.config import (
+from pimpmyrice.config_paths import (
     BASE_STYLE_FILE,
     CONFIG_FILE,
     JSON_SCHEMA_DIR,

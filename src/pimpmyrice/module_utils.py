@@ -19,11 +19,12 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from pimpmyrice import files, utils
-from pimpmyrice.config import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, Os
+from pimpmyrice.config_paths import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, Os
 from pimpmyrice.exceptions import IfCheckFailed
+from pimpmyrice.files import load_yaml
 from pimpmyrice.logger import current_module
-from pimpmyrice.utils import AttrDict, Timer, parse_string_vars
+from pimpmyrice.template import parse_string_vars, process_template
+from pimpmyrice.utils import AttrDict, Timer, is_process_running
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
@@ -87,7 +88,7 @@ class ShellAction(BaseModel):
     )
 
     async def run(self, theme_dict: AttrDict) -> None:
-        cmd = utils.parse_string_vars(
+        cmd = parse_string_vars(
             string=self.command,
             module_name=self.module_name,
             theme_dict=theme_dict,
@@ -133,7 +134,7 @@ class FileAction(BaseModel):
 
     async def run(self, theme_dict: AttrDict, out_dir: Path | None = None) -> None:
         template = Path(
-            utils.parse_string_vars(
+            parse_string_vars(
                 string=str(
                     MODULES_DIR / self.module_name / "templates" / self.template
                 ),
@@ -142,7 +143,7 @@ class FileAction(BaseModel):
             )
         )
         target = Path(
-            utils.parse_string_vars(
+            parse_string_vars(
                 string=self.target,
                 module_name=self.module_name,
                 theme_dict=theme_dict,
@@ -160,7 +161,7 @@ class FileAction(BaseModel):
 
         with open(template, "r", encoding="utf-8") as f:
             data = f.read()
-        processed_data = utils.process_template(data, theme_dict)
+        processed_data = process_template(data, theme_dict)
 
         with open(target, "w", encoding="utf-8") as f:
             f.write(processed_data)
@@ -233,7 +234,7 @@ class IfRunningAction(BaseModel):
     )
 
     async def run(self, _: AttrDict) -> None:
-        running = utils.is_process_running(self.program_name)
+        running = is_process_running(self.program_name)
         if self.should_be_running != running:
             raise IfCheckFailed(f"{self.__str__()} returned false")
 
@@ -403,7 +404,7 @@ async def run_shell_command(command: str, cwd: Path | None = None) -> ShellRespo
 
 
 def load_module_conf(module_name: str) -> dict[str, Any]:
-    data = files.load_yaml(MODULES_DIR / module_name / "conf.yaml")
+    data = load_yaml(MODULES_DIR / module_name / "conf.yaml")
     return data
 
 

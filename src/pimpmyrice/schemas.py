@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, create_model
 
-from pimpmyrice.config import CLIENT_OS, JSON_SCHEMA_DIR, Os
+from pimpmyrice.config_paths import CLIENT_OS, JSON_SCHEMA_DIR, Os
 from pimpmyrice.files import save_json
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme

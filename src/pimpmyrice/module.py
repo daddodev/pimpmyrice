@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pimpmyrice import module_utils as mutils
-from pimpmyrice.config import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
+from pimpmyrice.config_paths import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
 from pimpmyrice.files import save_yaml
 from pimpmyrice.module_utils import (
     FileAction,
@@ -21,7 +21,8 @@ from pimpmyrice.module_utils import (
     module_context_wrapper,
 )
 from pimpmyrice.parsers import parse_module
-from pimpmyrice.utils import AttrDict, Lock, Timer, is_locked, parse_string_vars
+from pimpmyrice.template import parse_string_vars
+from pimpmyrice.utils import AttrDict, Lock, Timer, is_locked
 
 if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
