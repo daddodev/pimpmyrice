@@ -44,9 +44,10 @@ jobs:
             exit 1
           fi
 
+
   python_build:
     name: Build Python package wheel and source tarball
-    # needs: [details]
+    needs: [details]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -108,6 +109,7 @@ jobs:
       - name: Publish distribution to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
 
+
   # TODO build .pkg.tar.zst
   aur_publish:
     name: Update AUR package
@@ -139,7 +141,7 @@ jobs:
       - name: Generate PKGBUILD
         run: |
           cd packaging/aur
-          bash generate_pkgbuild.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }} ${{ env.LICENSE }} ${{ env.PACKAGE_DESCRIPTION }}
+          bash generate_pkgbuild.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }} ${{ env.LICENSE }} "${{ env.PACKAGE_DESCRIPTION }}"
 
       - name: Publish AUR package
         uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
@@ -154,8 +156,7 @@ jobs:
 
 
   deb_build:
-    name: Build .deb packages
-    # needs: [details, python_build]
+    name: Build .deb package
     needs: [python_build]
     runs-on: ubuntu-latest
     environment:
@@ -169,13 +170,11 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Build packages
+      - name: Build package
         run: |
-          ls -l dist/
-          # Usage: build_deb.sh <deb_dir> <tarball> <email> <gpg_private_key> <gpg_passphrase>
-          bash packaging/ppa/build_deb.sh packaging/ppa/debian dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }} xd xd
-          ls -l /tmp/debs/
-
+          # Usage: build_deb.sh <deb_dir> <tarball> <email>
+          bash packaging/ppa/build_deb.sh packaging/ppa/debian/ dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }}
+      
       - name: Upload .deb package as artifact
         uses: actions/upload-artifact@v4
         with:
@@ -185,30 +184,12 @@ jobs:
 
   ppa_publish:
     name: Upload release to Ubuntu PPA
-    # needs: [details, python_build]
-    needs: ["deb_build"]
+    needs: ["python_build"]
     runs-on: ubuntu-latest
     environment:
       name: release
     steps:
       - uses: actions/checkout@v4
-
-      # - name: Fetch latest version from PPA
-      #   run: |
-      #     latest_ppa_version=$(apt-cache policy ${{ env.PACKAGE_NAME }} | grep Candidate | awk '{print $2}')
-      #     echo "Latest version on PPA: $latest_ppa_version"
-      #     echo "latest_ppa_version=$latest_ppa_version" >> $GITHUB_ENV
-      #
-      # - name: Compare versions and exit if not newer
-      #   run: |
-      #     NEW_VERSION=${{ needs.details.outputs.new_version }}
-      #     LATEST_VERSION=$latest_ppa_version
-      #     if [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
-      #       echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on PPA."
-      #       exit 1
-      #     else
-      #       echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on PPA."
-      #     fi
 
       - name: Download python builds
         uses: actions/download-artifact@v4
@@ -216,36 +197,17 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Download debian builds
-        uses: actions/download-artifact@v4
+      - name: Publish to PPA
+        uses: yuezk/publish-ppa-package@v2.0.1
         with:
-          name: debs
-          path: debs/
+          repository: "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}"
+          gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+          gpg_passphrase: ${{ secrets.PPA_GPG_PASSPHRASE }}
+          deb_email: "${{ env.AUTHOR_EMAIL }}"
+          deb_fullname: "${{ env.AUTHOR_NAME }}"
+          tarball: dist/${{ env.PACKAGE_NAME }}-*.tar.gz
+          debian_dir: packaging/ppa/debian
 
-      - run: |
-          ls -l dist/
-          ls -l debs/
-
-          # Usage: build_deb.sh <deb_dir> <tarball> <email> <gpg_private_key> <gpg_passphrase>
-          # bash packaging/ppa/build_deb.sh packaging/ppa/debian dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }} xd xd
-
-      # - name: Publish to PPA
-      #   uses: yuezk/publish-ppa-package@v2
-      #   with:
-      #     repository: "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}"
-      #     gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
-      #     gpg_passphrase: ${{ secrets.PPA_GPG_PASSPHRASE }}
-      #     deb_email: "${{ env.AUTHOR_EMAIL }}"
-      #     deb_fullname: "${{ env.AUTHOR_NAME }}"
-      #     tarball: dist/${{ env.PACKAGE_NAME }}-*.tar.gz
-      #     debian_dir: packaging/ppa/debian
-      #
-
-      # - name: Upload .deb package as artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: deb
-      #     path: ./*.deb
 
 
   # # TODO edit to run on ubuntu-latest
@@ -303,7 +265,7 @@ jobs:
 
   github_release:
     name: Create GitHub Release
-    needs: [details, python_build, ppa_publish]
+    needs: [details, python_build, deb_build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -313,15 +275,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download artifacts
+      - name: Download python artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
+
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: debs
+          path: debs/
+
+      - name: Create release dir
+        run: |
+          mkdir release
+          cp dist/* release/
+          cp debs/* release/
 
       - name: Create GitHub Release
         id: create_release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ needs.details.outputs.tag_name }} dist/* --title ${{ needs.details.outputs.tag_name }} --generate-notes
+          gh release create ${{ needs.details.outputs.tag_name }} release/* --title ${{ needs.details.outputs.tag_name }} --generate-notes

@@ -5,6 +5,7 @@
 }:
 
 python3.pkgs.buildPythonApplication rec {
+  # TODO gen from template
   pname = "pimpmyrice";
   version = "0.3.2";
   pyproject = true;
