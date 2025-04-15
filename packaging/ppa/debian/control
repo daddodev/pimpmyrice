@@ -2,7 +2,7 @@ Source: pimpmyrice
 Section: unknown
 Priority: optional
 Maintainer: daddodev <daddodev@gmail.com>
-Build-Depends: debhelper-compat (= 13), dh-python, python3-all, pybuild-plugin-pyproject
+Build-Depends: debhelper-compat (= 12), dh-python, python3-all, pybuild-plugin-pyproject
 Standards-Version: 4.6.1
 Homepage: https://github.com/daddodev/pimpmyrice
 Rules-Requires-Root: no
