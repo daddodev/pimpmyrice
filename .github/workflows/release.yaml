@@ -10,6 +10,7 @@ on:
 
 env:
   PACKAGE_NAME: "pimpmyrice"
+  CMD_NAME: "pimp"
   PACKAGE_DESCRIPTION: "The overkill theme manager"
   AUTHOR_NAME: "daddodev"
   AUTHOR_EMAIL: "daddodev@gmail.com"
@@ -65,7 +66,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist
+          name: python
           path: dist/
 
 
@@ -263,10 +264,107 @@ jobs:
   #       run:
   #         copr-cli build create --project="${{ env.PACKAGE_NAME }}" --chroot="fedora-34-x86_64" --src="${{ github.workspace }}/dist/${{ env.PACKAGE_NAME }}-*.tar.gz" --description="Package for COPR" --nvr="${{ env.PACKAGE_NAME }}-${{ github.sha }}"
 
+  build_linux_binary:
+    name: build linux binary
+    needs: [details, python_build ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile ${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.PACKAGE_NAME }}-{{ needs.details.outputs.new_version }}_linux
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux_binary
+          path: dist/
+
+
+  build_windows_binary:
+    name: build windows binary
+    needs: [details, python_build ]
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile ${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.PACKAGE_NAME }}-{{ needs.details.outputs.new_version }}
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows_binary
+          path: dist/
+
+
+  build_windows_installer:
+    runs-on: windows-latest
+    needs: [ details, build_windows_binary ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download windows binary artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: windows_binary
+          path: dist
+
+      - name: Compile installer with Inno Setup
+        uses: josegonzalez/inno-setup-action@v1.2.2
+        with:
+          path: packaging/windows/installer.iss
+          options: |
+            /O+
+            /DAppName=${{ env.PACKAGE_NAME }}
+            /DAppCmd=${{ env.CMD_NAME }}
+            /DAppVersion=${ needs.details.outputs.new_version }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows_installer
+          path: installer_output/*.exe
+
 
   github_release:
     name: Create GitHub Release
-    needs: [details, python_build, deb_build]
+    needs: [
+      details,
+      python_build,
+      deb_build,
+      build_linux_binary,
+      build_windows_binary,
+      build_windows_installer,
+    ]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -279,8 +377,8 @@ jobs:
       - name: Download python artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist
-          path: dist/
+          name: python
+          path: python/
 
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
@@ -288,11 +386,32 @@ jobs:
           name: debs
           path: debs/
 
+      - name: Download linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux_binary
+          path: linux_binary/
+
+      - name: Download windows binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows_binary
+          path: windows_binary/
+
+      - name: Download windows installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows_installer
+          path: windows_installer/
+
       - name: Create release dir
         run: |
           mkdir release
-          cp dist/* release/
+          cp python/* release/
           cp debs/* release/
+          cp linux_binary/* release/
+          cp windows_binary/* release/
+          cp windows_installer/* release/
 
       - name: Create GitHub Release
         id: create_release
