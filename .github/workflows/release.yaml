@@ -297,7 +297,7 @@ jobs:
 
   build_windows_binary:
     name: build windows binary
-    needs: [details, python_build ]
+    # needs: [details, python_build ]
     runs-on: windows-latest
 
     steps:
@@ -317,7 +317,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile ${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.PACKAGE_NAME }}-{{ needs.details.outputs.new_version }}
+          pyinstaller --onefile src/${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.PACKAGE_NAME }}-{{ needs.details.outputs.new_version }}
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
