@@ -297,7 +297,7 @@ jobs:
 
   build_windows_binary:
     name: build windows binary
-    # needs: [details, python_build ]
+    needs: [details, python_build ]
     runs-on: windows-latest
 
     steps:
