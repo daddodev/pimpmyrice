@@ -347,7 +347,7 @@ jobs:
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
           path: packaging/windows/installer.iss
-          options: "/O+ /DAppName=${{ env.PACKAGE_NAME }} /DCmdName=${{ env.CMD_NAME }} /DAppVersion=0.5.0"
+          options: "/O+ /DAppName=${{ env.PACKAGE_NAME }} /DCmdName=${{ env.CMD_NAME }} /DAppVersion=${{ needs.details.outputs.new_version }}"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
