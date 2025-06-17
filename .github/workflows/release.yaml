@@ -266,7 +266,6 @@ jobs:
 
   build_linux_binary:
     name: build linux binary
-    needs: [details, python_build ]
     runs-on: ubuntu-latest
 
     steps:
@@ -286,7 +285,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile ${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.PACKAGE_NAME }}-{{ needs.details.outputs.new_version }}_linux
+          pyinstaller packaging/pyinstaller.spec
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -297,7 +296,6 @@ jobs:
 
   build_windows_binary:
     name: build windows binary
-    # needs: [details, python_build ]
     runs-on: windows-latest
 
     steps:
@@ -317,7 +315,7 @@ jobs:
 
       - name: Build executable with PyInstaller
         run: |
-          pyinstaller --onefile src/${{ env.PACKAGE_NAME }}/__main__.py --name ${{ env.CMD_NAME }}
+          pyinstaller packaging/pyinstaller.spec
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -338,22 +336,17 @@ jobs:
           name: windows_binary
           path: dist
       
-      - name: Copy windows binary to packaging/windows/dist
-        run: |
-          mkdir -p packaging/windows/dist
-          cp dist/${{ env.CMD_NAME }}.exe packaging/windows/dist/
-
       - name: Compile installer with Inno Setup
         uses: Minionguyjpro/Inno-Setup-Action@v1.2.2
         with:
-          path: packaging/windows/installer.iss
+          path: packaging/windows/inno_setup.iss
           options: "/O+ /DAppName=${{ env.PACKAGE_NAME }} /DCmdName=${{ env.CMD_NAME }} /DAppVersion=${{ needs.details.outputs.new_version }}"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows_installer
-          path: packaging/windows/installer_output/*.exe
+          path: dist/*Setup*.exe
 
 
   github_release:
