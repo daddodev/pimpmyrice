@@ -69,10 +69,11 @@ class ThemeManager:
             log.error("failed loading base_style.json")
             raise
 
-    def save_base_style(self, base_style: dict[str, Any]) -> None:
+    async def save_base_style(self, base_style: dict[str, Any]) -> None:
         save_json(BASE_STYLE_FILE, base_style)
         self.base_style = base_style
         schemas.generate_theme_json_schema(self)
+        await self.event_handler.publish("theme_applied")
 
     @staticmethod
     def get_styles() -> dict[str, Style]:
