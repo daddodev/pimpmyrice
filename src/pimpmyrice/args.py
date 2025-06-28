@@ -60,7 +60,7 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
             return
 
         elif args["delete"]:
-            tm.delete_theme(args["THEME"])
+            await tm.delete_theme(args["THEME"])
             return
         elif args["export"]:
             await tm.export_theme(

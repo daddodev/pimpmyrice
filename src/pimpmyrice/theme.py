@@ -145,6 +145,8 @@ class ThemeManager:
         await self.save_theme(theme)
         log.info(f'theme "{theme.name}" generated')
 
+        await self.event_handler.publish("themes_changed")
+
         if apply:
             await self.apply_theme(theme.name)
 
@@ -244,7 +246,7 @@ class ThemeManager:
             await self.save_theme(theme=theme, old_name=theme.name)
             log.info(f'theme "{theme.name}" rewritten')
 
-    def delete_theme(self, theme_name: str) -> None:
+    async def delete_theme(self, theme_name: str) -> None:
         if theme_name not in self.themes:
             raise Exception(f'theme "{theme_name}" not found')
 
@@ -260,6 +262,8 @@ class ThemeManager:
         self.themes.pop(theme_name)
 
         log.info(f'theme "{theme_name}" deleted')
+
+        await self.event_handler.publish("themes_changed")
 
     async def apply_theme(
         self,

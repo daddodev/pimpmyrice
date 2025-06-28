@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Any, Union
 
@@ -25,8 +26,11 @@ def parse_theme(
     path: Path,
 ) -> Theme:
     name = path.name
+    theme_file = path / "theme.json"
 
-    data = load_json(path / "theme.json")
+    data = load_json(theme_file)
+
+    data["last_modified"] = os.path.getmtime(theme_file) * 1000
 
     data["wallpaper"] = parse_wallpaper(data["wallpaper"], path)
 

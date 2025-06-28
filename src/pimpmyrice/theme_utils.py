@@ -91,6 +91,7 @@ class Theme(BaseModel):
     modes: dict[str, Mode] = {}
     style: Style = {}
     tags: set[str] = set()
+    last_modified: float = 0
 
     @validator("tags", pre=True)
     def coerce_to_set(cls, value: Any) -> Any:  # pylint: disable=no-self-argument
