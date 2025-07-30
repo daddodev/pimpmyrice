@@ -474,7 +474,7 @@ class ThemeManager:
 
         readme = f"""# "{theme_name}" {mode_name} theme dotfiles
 
-Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `export theme`
+Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `theme export`
 
 ## Requirements:
 
@@ -487,3 +487,18 @@ Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `export theme
             f.write(readme)
 
         log.info(f'theme "{theme_name}" exported to {dump_dir}')
+
+    async def install_module(self, source: str) -> None:
+        module_name = await self.mm.install_module(source)
+
+        if theme_name := self.config.theme:
+            log.info(f'applying theme "{theme_name}" to "{module_name}"...')
+            theme_dict = tutils.gen_theme_dict(
+                self,
+                theme_name=theme_name,
+                mode_name=self.config.mode,
+            )
+
+            await self.mm.run_modules(theme_dict, include_modules=[module_name])
+
+            log.info(f'theme "{theme_name}" applied to "{module_name}"')

@@ -186,13 +186,6 @@ class ModuleManager:
             # save_json(MODULES_DIR / module.name / "module.json", dump)
             log.info(f'module "{module.name}" rewritten')
 
-    async def init_module(self, module_name: str) -> None:
-        if module_name not in self.modules:
-            raise Exception(f'module "{module_name}" not found')
-
-        module = self.modules[module_name]
-        await module.execute_init()
-
     async def create_module(self, module_name: str) -> None:
         # TODO add --bare; README, LICENSE
 
@@ -238,48 +231,39 @@ class ModuleManager:
         await self.modules[module_name].execute_init()
         log.info(f'module "{module_name}" created')
 
-    async def clone_module(self, source: str | list[str]) -> None:
-        sources = source if isinstance(source, list) else [source]
+    async def install_module(self, source: str) -> str:
+        name = await self.clone_module(source)
 
-        for source in sources:
-            source = str(source)
+        await self.modules[name].execute_init()
 
-            if source.startswith(("git@", "http://", "https://")):
-                name = await mutils.clone_from_git(source)
+        log.info(f'module "{name}" installed')
+        return name
 
-            elif source.startswith("pimp://"):
-                url = f"{REPOS_BASE_ADDR}/{source.removeprefix('pimp://')}"
-                name = await mutils.clone_from_git(url)
+    async def clone_module(self, source: str, out_dir: str | Path = MODULES_DIR) -> str:
+        out_dir = Path(out_dir) if out_dir else MODULES_DIR
 
-            else:
-                name = await mutils.clone_from_folder(Path(source))
+        if source.startswith(("git@", "http://", "https://")):
+            name = await mutils.clone_from_git(source, out_dir)
+        elif Path(source).is_absolute() or source.startswith("."):
+            name = await mutils.clone_from_folder(Path(source), out_dir)
+        else:
+            url = f"{REPOS_BASE_ADDR}/{source}"
+            name = await mutils.clone_from_git(url, out_dir)
 
+        log.info(f'module "{name}" cloned')
+
+        if out_dir == MODULES_DIR:
             module = parse_module(MODULES_DIR / name)
-
-            if module.init:
-                await module.execute_init()
-
-            for action in module.run:
-                if isinstance(action, FileAction):
-                    target = Path(parse_string_vars(action.target))
-                    if target.exists():
-                        copy_path = f"{target}.bkp"
-                        shutil.copyfile(target, copy_path)
-                        log.info(f'"{target.name}" copied to "{target.name}.bkp"')
-
-                    link_path = Path(str(target) + ".j2")
-                    if link_path.exists() or link_path.is_symlink():
-                        log.info(
-                            f'skipping linking "{link_path}" to "{action.template}", destination already exists'
-                        )
-                        continue
-
-                    link_path.parent.mkdir(exist_ok=True, parents=True)
-                    os.symlink(action.template, link_path)
-                    log.info(f'linked "{link_path}" to "{action.template}"')
-
             self.modules[name] = module
-            log.info(f'module "{name}" cloned')
+
+        return name
+
+    async def init_module(self, module_name: str) -> None:
+        if module_name not in self.modules:
+            raise Exception(f'module "{module_name}" not found')
+
+        module = self.modules[module_name]
+        await module.execute_init()
 
     async def delete_module(self, module_name: str) -> None:
         if module_name not in self.modules:

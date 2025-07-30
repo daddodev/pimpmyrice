@@ -23,8 +23,6 @@ async def process_edit_args(args: dict[str, Any]) -> None:
     if not args["edit"]:
         return
 
-    if args["base-style"]:
-        open_editor(BASE_STYLE_FILE)
     elif args["theme"]:
         theme = args["THEME"]
 
@@ -41,6 +39,10 @@ async def process_edit_args(args: dict[str, Any]) -> None:
 
     elif args["style"]:
         style = args["STYLE"]
+
+        if not style:
+            open_editor(BASE_STYLE_FILE)
+            return
 
         style_path = STYLES_DIR / f"{style}.json"
         if not style_path.is_file():

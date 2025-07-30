@@ -305,8 +305,43 @@ class Module(BaseModel):
         await self.commands[command_name].run(tm=tm, *args, **kwargs)
 
     async def execute_init(self) -> None:
-        for action in self.init:
-            await action.run()
+        for init_action in self.init:
+            await init_action.run()
+
+        for action in self.run:
+            if isinstance(action, FileAction):
+                target = Path(
+                    parse_string_vars(
+                        string=action.target,
+                        module_name=self.name,
+                    )
+                ).absolute()
+                if target.exists():
+                    copy_path = f"{target}.bkp"
+                    shutil.copyfile(target, copy_path)
+                    log.info(f'"{target}" copied to "{target.name}.bkp"')
+
+                link_path = target.with_name(target.name + ".j2")
+                template_path = Path(
+                    parse_string_vars(
+                        string=str(
+                            MODULES_DIR / self.name / "templates" / action.template
+                        ),
+                        module_name=self.name,
+                    )
+                ).absolute()
+
+                if link_path.exists() or link_path.is_symlink():
+                    log.info(
+                        f'skipping linking "{link_path}" to template "{template_path}", destination already exists'
+                    )
+                    continue
+
+                link_path.parent.mkdir(exist_ok=True, parents=True)
+                os.symlink(template_path, link_path)
+                log.info(f'linked "{link_path}" to "{template_path}"')
+
+        log.info(f'module "{self.name}" initialized')
 
     async def execute_pre_run(self, theme_dict: AttrDict) -> AttrDict:
         for action in self.pre_run:
@@ -408,12 +443,12 @@ def load_module_conf(module_name: str) -> dict[str, Any]:
     return data
 
 
-async def clone_from_folder(source: Path) -> str:
+async def clone_from_folder(source: Path, out_dir: Path = MODULES_DIR) -> str:
     if not (source / "module.yaml").exists():
-        raise Exception(f'module not found at "{source}"')
+        raise Exception(f'module not found at "{source.absolute()}"')
 
     name = source.name
-    dest_dir = MODULES_DIR / name
+    dest_dir = out_dir / name
     if dest_dir.exists():
         raise Exception(f'module "{name}" already present')
 
@@ -421,9 +456,9 @@ async def clone_from_folder(source: Path) -> str:
     return name
 
 
-async def clone_from_git(url: str) -> str:
+async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
     name = url.split("/")[-1].removesuffix(".git")
-    dest_dir = MODULES_DIR / name
+    dest_dir = out_dir / name
     if dest_dir.exists():
         raise Exception(f'module "{name}" already present')
 
