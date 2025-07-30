@@ -3,7 +3,7 @@ from typing import Any
 
 import jinja2
 
-from pimpmyrice.config_paths import CONFIG_DIR, HOME_DIR, MODULES_DIR
+from pimpmyrice.config_paths import CONFIG_DIR, HOME_DIR, MODULES_DIR, PIMP_CONFIG_DIR
 from pimpmyrice.exceptions import ReferenceNotFound
 
 
@@ -38,7 +38,10 @@ def parse_string_vars(
 ) -> str:
     # TODO capitalize
 
-    d = {"home_dir": HOME_DIR, "config_dir": CONFIG_DIR}
+    d = {"home_dir": HOME_DIR,
+         "config_dir": CONFIG_DIR,
+         "pimp_config_dir": PIMP_CONFIG_DIR
+         }
     if module_name:
         d["module_dir"] = MODULES_DIR / module_name
         d["templates_dir"] = MODULES_DIR / module_name / "templates"
