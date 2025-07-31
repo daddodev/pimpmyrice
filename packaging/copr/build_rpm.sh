@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Arguments:
 # 1: Package Name
@@ -8,33 +8,47 @@
 # 5: Author Name
 # 6: Author Email
 
-PACKAGE_NAME=$1
-VERSION=$2
-RELEASE=$3
-LICENSE=$4
-AUTHOR_NAME=$5
-AUTHOR_EMAIL=$6
-DATE=$(date +"%a %b %d %Y")
-
 # Check if the user provided enough arguments
 if [ $# -ne 6 ]; then
-  echo "Usage: $0 <package_name> <version> <release> <license> <author_name> <author_email" >&2
+  echo "Usage: $0 <package_name> <version> <release> <license> <author_name> <author_email>" >&2
   exit 1
 fi
 
+PACKAGE_NAME="$1"
+VERSION="$2"
+RELEASE="$3"
+LICENSE="$4"
+AUTHOR_NAME="$5"
+AUTHOR_EMAIL="$6"
+DATE=$(date +"%a %b %d %Y")
+
 # Set paths for RPM packaging
-RPMBUILD_DIR=~/rpmbuild
-SPEC_FILE="${RPMBUILD_DIR}/${PACKAGE_NAME}.spec"
+RPMBUILD_DIR="/home/builder/rpmbuild"
+SPEC_FILE="${RPMBUILD_DIR}/SPECS/${PACKAGE_NAME}.spec"
 SOURCE_DIR="${RPMBUILD_DIR}/SOURCES"
 BUILD_DIR="${RPMBUILD_DIR}/BUILD"
-INSTALL_DIR="${RPMBUILD_DIR}/BUILDROOT"
+BUILDROOT_DIR="${RPMBUILD_DIR}/BUILDROOT"
 RPM_DIR="${RPMBUILD_DIR}/RPMS"
 
+# Install required tools and build dependencies
+dnf install -y rpmdevtools || exit 1
+
+# Ensure build user exists and has a home directory
+if ! id builder &>/dev/null; then
+  useradd -m -s /bin/bash builder
+fi
+
 # Create necessary directories
-mkdir -p "$RPMBUILD_DIR" "$SOURCE_DIR" "$BUILD_DIR" "$INSTALL_DIR"
+su builder -c "rpmdev-setuptree"
+# rpmdev-setuptree
 
 # Copy the tarball from the dist folder to SOURCES
-cp "dist/${PACKAGE_NAME}-${VERSION}.tar.gz" "$SOURCE_DIR/"
+TARBALL="dist/${PACKAGE_NAME}-${VERSION}.tar.gz"
+if [[ ! -f "$TARBALL" ]]; then
+  echo "Error: Source tarball $TARBALL not found!"
+  exit 1
+fi
+cp "$TARBALL" "$SOURCE_DIR/"
 
 # Check if the spec.template file exists
 SPEC_TEMPLATE_FILE="packaging/copr/spec.template"
@@ -54,24 +68,21 @@ sed -i "s|%{license}|$LICENSE|g" "$SPEC_FILE"
 sed -i "s|%{author_name}|$AUTHOR_NAME|g" "$SPEC_FILE"
 sed -i "s|%{author_email}|$AUTHOR_EMAIL|g" "$SPEC_FILE"
 sed -i "s|%{date}|$DATE|g" "$SPEC_FILE"
+echo "✅ Created spec file: $SPEC_FILE"
+echo "📦 Source tarball: $SOURCE_DIR/${PACKAGE_NAME}-${VERSION}.tar.gz"
 
-echo "Created spec file: $SPEC_FILE"
+dnf builddep -y "$SPEC_FILE" || exit 1
+echo "✅ Installed build dependencies"
 
-echo "Source tarball: $SOURCE_DIR/${PACKAGE_NAME}-$VERSION.tar.gz"
+# Build the RPM package as 'builder'
+chown -R builder:builder $RPMBUILD_DIR
+su builder -c "
+  set -euo pipefail
+  rpmbuild -ba /home/builder/rpmbuild/SPECS/${PACKAGE_NAME}.spec
+"
+echo "✅ Built RPM package"
 
-# Install build dependencies
-dnf install -y rpmdevtools
-rpmdev-setuptree
-echo "Installed build dependencies"
-
-# Install build dependencies in pimpmyrice.spec
-dnf builddep -y ~/rpmbuild/pimpmyrice.spec
-echo "Installed build dependencies for pimpmyrice.spec"
-
-# Build the RPM package
-rpmbuild -ba "$SPEC_FILE"
-echo "Built RPM package"
-
-# Move the RPM package to the RPMS directory
-mv $RPM_DIR/noarch/*.rpm ./dist/
-echo "Moved RPM package to dist directory"
+# Copy RPM to dist directory
+mkdir -p dist
+find /home/builder/rpmbuild/RPMS/ -name '*.rpm' -exec cp {} ./dist/ \;
+echo "📦 Copied RPM package to ./dist/"

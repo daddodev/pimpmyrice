@@ -66,7 +66,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python
+          name: python_build
           path: dist/
 
 
@@ -104,7 +104,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: python_build
           path: dist/
 
       - name: Publish distribution to PyPI
@@ -168,7 +168,7 @@ jobs:
       - name: Download python builds
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: python_build
           path: dist/
 
       - name: Build package
@@ -195,7 +195,7 @@ jobs:
       - name: Download python builds
         uses: actions/download-artifact@v4
         with:
-          name: dist
+          name: python_build
           path: dist/
 
       - name: Publish to PPA
@@ -211,41 +211,63 @@ jobs:
           debmake_arguments: "-b :python3"
 
 
+  rpm_build:
+    name: Build .rpm package
+    needs: [details, python_build]
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v4
 
-  # # TODO edit to run on ubuntu-latest
+      - name: Install dependencies
+        run: |
+          dnf install -y nodejs su
+          echo "Installed build dependencies"
+
+      - name: Download python builds
+        uses: actions/download-artifact@v4
+        with:
+          name: python_build
+          path: dist/
+
+      - name: Build RPM package
+        run: |
+          # Usage: packaging/copr/build_rpm.sh <package_name> <version> <release> <license> <author_name> <author_email>
+          bash packaging/copr/build_rpm.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} 1 ${{ env.LICENSE }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }}
+
+      - name: Upload .rpm package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms
+          path: dist/*.rpm
+
+
   # copr_publish:
   #   name: Upload release to COPR
-  #   needs: [details, python_build]
+  #   needs: [rpm_build]
   #   runs-on: ubuntu-latest
   #   environment:
   #     name: release
   #   steps:
   #     - uses: actions/checkout@v4
   #
-  #     - name: Build RPM package
-  #       run: |
-  #         bash packaging/copr/build_rpm.sh ${{ env.PACKAGE_NAME }} ${{ needs.details.outputs.new_version }} 1 ${{ env.LICENSE }} ${{ env.AUTHOR_NAME }} ${{ env.AUTHOR_EMAIL }}
-  #
-  #     - name: Upload artifacts
-  #       uses: actions/upload-artifact@v4
+  #     - name: Download rpm artifacts
+  #       uses: actions/download-artifact@v4
   #       with:
-  #         name: dist
-  #         path: dist/*.rpm
-  #
-  #     - name: Install COPR CLI
-  #       run: |
-  #         sudo dnf install -y copr-cli
-  #
-  #     - name: Set up COPR credentials
-  #       run: |
-  #         echo "$COPR_API_KEY" > ~/.copr_api_key
-  #         echo "copr_username=${{ env.COPR_USER }}" > ~/.copr_config
-  #       env:
-  #         COPR_API_KEY: ${{ secrets.COPR_API_KEY }}
+  #         name: rpms
+  #         path: rpms/
   #
   #     - name: Fetch latest version from COPR
   #       run: |
-  #         latest_copr_version=$(copr-cli build list --project=${{ env.COPR_PROJECT }} --chroot=fedora-34-x86_64 | grep -oP "(?<=${{ env.PACKAGE_NAME }}-)[0-9.]+(?=\s)" | head -n 1 || echo "0.0.0")
+  #         # Extract owner and project from COPR_PROJECT (format: owner/project)
+  #         COPR_PROJECT="${{ secrets.COPR_PROJECT }}"
+  #         OWNER=$(echo "$COPR_PROJECT" | cut -d'/' -f1)
+  #         PROJECT=$(echo "$COPR_PROJECT" | cut -d'/' -f2)
+  #         # Fetch latest build info
+  #         latest_copr_version=$(curl -s "https://copr.fedorainfracloud.org/api_3/build/list?ownername=$OWNER&projectname=$PROJECT" | jq -r '.builds[0].chroot | split("-") | .[1]' | head -n1)
   #         echo "Latest version on COPR: $latest_copr_version"
   #         echo "latest_copr_version=$latest_copr_version" >> $GITHUB_ENV
   #
@@ -253,16 +275,30 @@ jobs:
   #       run: |
   #         NEW_VERSION=${{ needs.details.outputs.new_version }}
   #         LATEST_VERSION=$latest_copr_version
-  #         if [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
+  #         if [ -z "$LATEST_VERSION" ]; then
+  #           echo "No previous version found on COPR, proceeding."
+  #         elif [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
   #           echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on COPR."
   #           exit 1
   #         else
   #           echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on COPR."
   #         fi
   #
+  #     - name: Generate spec file
+  #       run: |
+  #         bash packaging/copr/generate_spec.sh \
+  #           "${{ env.PACKAGE_NAME }}" \
+  #           "${{ needs.details.outputs.new_version }}" \
+  #           "${{ env.AUTHOR_NAME }}" \
+  #           "${{ env.AUTHOR_EMAIL }}" \
+  #           "${{ env.LICENSE }}" \
+  #           "${{ env.PACKAGE_DESCRIPTION }}"
+  #
   #     - name: Publish to COPR
-  #       run:
-  #         copr-cli build create --project="${{ env.PACKAGE_NAME }}" --chroot="fedora-34-x86_64" --src="${{ github.workspace }}/dist/${{ env.PACKAGE_NAME }}-*.tar.gz" --description="Package for COPR" --nvr="${{ env.PACKAGE_NAME }}-${{ github.sha }}"
+  #       run: |
+  #         # Usage: publish_copr.sh <copr_project> <rpm_dir> <email>
+  #         bash packaging/copr/publish_copr.sh ${{ secrets.COPR_PROJECT }} rpms/ ${{ env.AUTHOR_EMAIL }}
+
 
   build_linux_binary:
     name: build linux binary
@@ -371,8 +407,8 @@ jobs:
       - name: Download python artifacts
         uses: actions/download-artifact@v4
         with:
-          name: python
-          path: python/
+          name: python_build
+          path: python_build/
 
       - name: Download deb artifacts
         uses: actions/download-artifact@v4
@@ -401,7 +437,7 @@ jobs:
       - name: Create release dir
         run: |
           mkdir release
-          cp python/* release/
+          cp python_build/* release/
           cp debs/* release/
           cp linux_binary/* release/
           cp windows_binary/* release/

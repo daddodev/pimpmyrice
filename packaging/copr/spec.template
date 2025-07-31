@@ -11,6 +11,8 @@ BuildArch:      noarch
 
 BuildRequires:  python3-devel, python3-build
 
+AutoReq: no
+
 Requires: python3-rich
 Requires: python3-docopt
 Requires: python3-pyyaml
