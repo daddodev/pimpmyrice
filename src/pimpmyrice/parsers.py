@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from typing import Any, Union
 
+from pimpmyrice.config_paths import CLIENT_OS
 from pimpmyrice.files import load_json, load_yaml
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme, Wallpaper
@@ -69,5 +70,9 @@ def parse_module(module_path: Path) -> Module:
         cmd["module_name"] = module_name
 
     module = Module(**data, name=module_name)
+
+    if CLIENT_OS not in module.os:
+        module.enabled = False
+        log.warn(f'module "{module.name}" disabled: not compatible with {CLIENT_OS}')
 
     return module
