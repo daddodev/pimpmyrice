@@ -53,7 +53,7 @@ async def cli() -> None:
     try:
         args = docopt(cli_doc)
     except DocoptExit:
-        print(cli_doc)
+        log.info(cli_doc)
         return
 
     if args["--verbose"]:
