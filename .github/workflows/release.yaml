@@ -425,6 +425,12 @@ jobs:
           name: debs
           path: debs/
 
+      - name: Download rpm artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rpms
+          path: rpms/
+
       - name: Download linux artifacts
         uses: actions/download-artifact@v4
         with:
@@ -448,6 +454,7 @@ jobs:
           mkdir release
           cp python_build/* release/
           cp debs/* release/
+          cp rpms/* release/
           cp linux_binary/* release/
           cp windows_binary/* release/
           cp windows_installer/* release/
