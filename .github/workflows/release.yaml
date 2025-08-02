@@ -111,7 +111,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
 
-  # TODO build .pkg.tar.zst
   aur_publish:
     name: Update AUR package
     needs: [details]
@@ -364,7 +363,7 @@ jobs:
     runs-on: windows-latest
     needs: [ details, build_windows_binary ]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Download windows binary artifact
         uses: actions/download-artifact@v4
