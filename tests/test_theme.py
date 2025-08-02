@@ -25,8 +25,8 @@ def tm() -> ThemeManager:
 
 
 @pytest.mark.asyncio(scope="session")
-async def test_clone_module(tm: ThemeManager) -> None:
-    await tm.mm.clone_module("pimp://alacritty")
+async def test_install_module(tm: ThemeManager) -> None:
+    await tm.mm.install_module("alacritty")
 
 
 @pytest.mark.asyncio(scope="session")

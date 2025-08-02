@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import shutil
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -21,7 +19,6 @@ from pimpmyrice.module_utils import (
     module_context_wrapper,
 )
 from pimpmyrice.parsers import parse_module
-from pimpmyrice.template import parse_string_vars
 from pimpmyrice.utils import AttrDict, Lock, Timer, is_locked
 
 if TYPE_CHECKING:
