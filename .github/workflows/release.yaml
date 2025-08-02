@@ -204,12 +204,6 @@ jobs:
           name: python_build
           path: dist/
 
-      # - name: Download python builds
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: debian_dir
-      #     path: debian_dir/
-
       - name: Build source pkg and upload to PPA
         env:
           GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
