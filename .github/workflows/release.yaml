@@ -181,9 +181,16 @@ jobs:
           name: debs
           path: /tmp/debs/
 
+      - name: Upload debian_dir as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian_dir
+          path: /tmp/debian_dir/
+
 
   ppa_publish:
     name: Upload release to Ubuntu PPA
+    # needs: ["deb_build"]
     needs: ["python_build"]
     runs-on: ubuntu-latest
     environment:
@@ -197,17 +204,20 @@ jobs:
           name: python_build
           path: dist/
 
-      - name: Publish to PPA
-        uses: yuezk/publish-ppa-package@v2.0.1
-        with:
-          repository: "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}"
-          gpg_private_key: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
-          gpg_passphrase: ${{ secrets.PPA_GPG_PASSPHRASE }}
-          deb_email: "${{ env.AUTHOR_EMAIL }}"
-          deb_fullname: "${{ env.AUTHOR_NAME }}"
-          tarball: dist/${{ env.PACKAGE_NAME }}-*.tar.gz
-          debian_dir: packaging/ppa/debian
-          debmake_arguments: "-b :python3"
+      # - name: Download python builds
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: debian_dir
+      #     path: debian_dir/
+
+      - name: Build source pkg and upload to PPA
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.PPA_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.PPA_GPG_PASSPHRASE }}
+          LAUNCHPAD_USERNAME: ${{ env.AUTHOR_NAME }}
+        run: |
+          # Usage: publish_ppa.sh <deb_dir> <tarball> <email>
+          bash packaging/ppa/publish_ppa.sh packaging/ppa/debian/ dist/${{ env.PACKAGE_NAME }}-*.tar.gz ${{ env.AUTHOR_EMAIL }}
 
 
   rpm_build:

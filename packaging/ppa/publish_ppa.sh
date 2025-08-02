@@ -19,6 +19,18 @@ echo "::endgroup::"
 
 export DEBIAN_FRONTEND=noninteractive
 
+echo "Importing GPG private key..."
+
+GPG_KEY_ID=$(echo "$GPG_PRIVATE_KEY" | gpg --import-options show-only --import | sed -n '2s/^\s*//p')
+echo $GPG_KEY_ID
+echo "$GPG_PRIVATE_KEY" | gpg --batch --passphrase "$GPG_PASSPHRASE" --import
+
+echo "Checking GPG expirations..."
+if [[ $(gpg --list-keys | grep expired) ]]; then
+    echo "GPG key has expired. Please update your GPG key." >&2
+    exit 1
+fi
+
 sudo apt-get update &&
     sudo apt-get install -y debmake debhelper devscripts equivs \
         software-properties-common
@@ -52,16 +64,19 @@ dch --create --distribution "$(lsb_release -cs)" \
 # Install build dependencies
 sudo mk-build-deps --install --remove --tool='apt-get -o Debug::pkgProblemResolver=yes --no-install-recommends --yes' debian/control
 
-debuild -b -us -uc
+# mk-build-deps will generate .buildinfo and .changes files, remove them, otherwise debuild will fail
+rm -vf ./*.buildinfo ./*.changes
+
+# debuild -S -sa -us -uc
+debuild -S -sa \
+    -k"$GPG_KEY_ID" \
+    -p"gpg --batch --passphrase "$GPG_PASSPHRASE" --pinentry-mode loopback"
 
 echo "Build completed for $package"
 
-rm -rf /tmp/debs/
-mkdir /tmp/debs/
-cp ../*.deb /tmp/debs/
-echo "copied .deb to /tmp/debs"
+# Upload to PPA
+echo "Uploading to PPA..."
+cd ..
+dput ppa:${LAUNCHPAD_USERNAME}/ppa ${package}_*.changes
 
-rm -rf /tmp/debian_dir/
-mkdir /tmp/debian_dir/
-cp -r debian/ /tmp/debian_dir/
-echo "copied debian/ to /tmp/debian_dir"
+echo "Upload complete for $package"
