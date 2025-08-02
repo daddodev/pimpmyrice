@@ -1,5 +1,6 @@
 Source: pimpmyrice
 Package: pimpmyrice
+Section: utils
 Priority: optional
 Maintainer: daddodev <daddodev@gmail.com>
 Build-Depends: debhelper-compat (= 12), dh-python, python3-all, pybuild-plugin-pyproject
