@@ -77,6 +77,6 @@ echo "Build completed for $package"
 # Upload to PPA
 echo "Uploading to PPA..."
 cd ..
-dput ppa:${LAUNCHPAD_USERNAME}/ppa ${package}_*.changes
+dput ppa:${LAUNCHPAD_USERNAME}/${package} ${package}_*.changes
 
 echo "Upload complete for $package"
