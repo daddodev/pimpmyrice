@@ -105,7 +105,7 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
             return
 
         elif args["delete"]:
-            for module_name in args["MODULE"]:
+            for module_name in args["MODULES"]:
                 await tm.mm.delete_module(module_name)
             return
 
