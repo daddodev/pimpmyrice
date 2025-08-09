@@ -7,6 +7,11 @@ on:
       - "[0-9]+.[0-9]+.[0-9]+a[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+b[0-9]+"
       - "[0-9]+.[0-9]+.[0-9]+rc[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
 
 env:
   PACKAGE_NAME: "pimpmyrice"
@@ -31,6 +36,7 @@ jobs:
         id: release
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
+            # Tag-based release
             TAG_NAME=${GITHUB_REF#refs/tags/}
             NEW_VERSION=$(echo $TAG_NAME | awk -F'-' '{print $1}')
             SUFFIX=$(echo $TAG_NAME | grep -oP '[a-z]+[0-9]+' || echo "")
@@ -41,8 +47,16 @@ jobs:
             echo "Suffix is $SUFFIX"
             echo "Tag name is $TAG_NAME"
           else
-            echo "No tag found"
-            exit 1
+            # Manual release via workflow_dispatch
+            NEW_VERSION="${{ github.event.inputs.version }}"
+            TAG_NAME="$NEW_VERSION"
+            SUFFIX=""
+            echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+            echo "suffix=$SUFFIX" >> "$GITHUB_OUTPUT"
+            echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
+            echo "Version is $NEW_VERSION"
+            echo "Suffix is $SUFFIX"
+            echo "Tag name is $TAG_NAME"
           fi
 
 
@@ -190,8 +204,7 @@ jobs:
 
   ppa_publish:
     name: Upload release to Ubuntu PPA
-    # needs: ["deb_build"]
-    needs: ["python_build"]
+    needs: [python_build]
     runs-on: ubuntu-latest
     environment:
       name: release
@@ -245,62 +258,94 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rpms
-          path: dist/*.rpm
+          path: rpms/*.rpm
 
+      - name: Upload .src.rpm package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: srpms
+          path: srpms/*.src.rpm
 
-  # copr_publish:
-  #   name: Upload release to COPR
-  #   needs: [rpm_build]
-  #   runs-on: ubuntu-latest
-  #   environment:
-  #     name: release
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #
-  #     - name: Download rpm artifacts
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: rpms
-  #         path: rpms/
-  #
-  #     - name: Fetch latest version from COPR
-  #       run: |
-  #         # Extract owner and project from COPR_PROJECT (format: owner/project)
-  #         COPR_PROJECT="${{ secrets.COPR_PROJECT }}"
-  #         OWNER=$(echo "$COPR_PROJECT" | cut -d'/' -f1)
-  #         PROJECT=$(echo "$COPR_PROJECT" | cut -d'/' -f2)
-  #         # Fetch latest build info
-  #         latest_copr_version=$(curl -s "https://copr.fedorainfracloud.org/api_3/build/list?ownername=$OWNER&projectname=$PROJECT" | jq -r '.builds[0].chroot | split("-") | .[1]' | head -n1)
-  #         echo "Latest version on COPR: $latest_copr_version"
-  #         echo "latest_copr_version=$latest_copr_version" >> $GITHUB_ENV
-  #
-  #     - name: Compare versions and exit if not newer
-  #       run: |
-  #         NEW_VERSION=${{ needs.details.outputs.new_version }}
-  #         LATEST_VERSION=$latest_copr_version
-  #         if [ -z "$LATEST_VERSION" ]; then
-  #           echo "No previous version found on COPR, proceeding."
-  #         elif [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
-  #           echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on COPR."
-  #           exit 1
-  #         else
-  #           echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on COPR."
-  #         fi
-  #
-  #     - name: Generate spec file
-  #       run: |
-  #         bash packaging/copr/generate_spec.sh \
-  #           "${{ env.PACKAGE_NAME }}" \
-  #           "${{ needs.details.outputs.new_version }}" \
-  #           "${{ env.AUTHOR_NAME }}" \
-  #           "${{ env.AUTHOR_EMAIL }}" \
-  #           "${{ env.LICENSE }}" \
-  #           "${{ env.PACKAGE_DESCRIPTION }}"
-  #
-  #     - name: Publish to COPR
-  #       run: |
-  #         # Usage: publish_copr.sh <copr_project> <rpm_dir> <email>
-  #         bash packaging/copr/publish_copr.sh ${{ secrets.COPR_PROJECT }} rpms/ ${{ env.AUTHOR_EMAIL }}
+  copr_publish:
+    name: Upload release to COPR
+    needs: [details, rpm_build]
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    environment:
+      name: release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          dnf install -y nodejs su jq
+          echo "Installed build dependencies"
+
+      - name: Download python builds
+        uses: actions/download-artifact@v4
+        with:
+          name: python_build
+          path: dist/
+
+      - name: Download SRPM
+        uses: actions/download-artifact@v4
+        with:
+          name: srpms
+          path: srpms/
+
+      - name: Fetch latest version from COPR
+        run: |
+          # Query the COPR API with latest build info
+          response=$(curl -s "https://copr.fedorainfracloud.org/api_3/package/?ownername=$AUTHOR_NAME&projectname=$PACKAGE_NAME&packagename=$PACKAGE_NAME&with_latest_build=true")
+
+          # Check for "error" key
+          if echo "$response" | jq -e 'has("error")' > /dev/null; then
+            error_message=$(echo "$response" | jq -r '.error')
+
+            expected_error="No package with name $PACKAGE_NAME in copr $PACKAGE_NAME"
+            if [[ "$error_message" == "$expected_error" ]]; then
+              echo "⚠️ Package not found in COPR yet. Assuming first upload."
+              latest_copr_version="0.0.0"
+            else
+              echo "❌ COPR API error: $error_message"
+              exit 1
+            fi
+          else
+            # Extract version directly from source_package.version
+            latest_copr_version=$(echo "$response" | jq -r '.builds.latest.source_package.version // empty')
+
+            # Handle the case where latest build info is missing
+            if [[ -z "$latest_copr_version" ]]; then
+              echo "⚠️ No latest build version found. Assuming first upload."
+              latest_copr_version="0.0.0"
+            fi
+          fi
+
+          echo "📦 Latest version on COPR: $latest_copr_version"
+          echo "latest_copr_version=$latest_copr_version" >> $GITHUB_ENV
+
+      - name: Compare versions and exit if not newer
+        run: |
+          NEW_VERSION=${{ needs.details.outputs.new_version }}
+          LATEST_VERSION=$latest_copr_version
+          if [ -z "$LATEST_VERSION" ]; then
+            echo "No previous version found on COPR, proceeding."
+          elif [ "$(printf '%s\n' "$LATEST_VERSION" "$NEW_VERSION" | sort -rV | head -n 1)" != "$NEW_VERSION" ] || [ "$NEW_VERSION" == "$LATEST_VERSION" ]; then
+            echo "The new version $NEW_VERSION is not greater than the latest version $LATEST_VERSION on COPR."
+            exit 1
+          else
+            echo "The new version $NEW_VERSION is greater than the latest version $LATEST_VERSION on COPR."
+          fi
+
+      - name: Publish to COPR
+        env:
+          COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
+          COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
+          COPR_USERNAME: ${{ env.AUTHOR_NAME }}
+        run: |
+          # Usage: publish_copr.sh <copr_project> <srpm_file>" >&2
+          bash packaging/copr/publish_copr.sh "${{ env.AUTHOR_NAME }}/${{ env.PACKAGE_NAME }}" ./srpms/*.src.rpm
 
 
   build_linux_binary:

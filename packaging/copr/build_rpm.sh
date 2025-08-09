@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 
-# Arguments:
-# 1: Package Name
-# 2: Version
-# 3: Release (e.g., 1, 2)
-# 4: License
-# 5: Author Name
-# 6: Author Email
-
 # Check if the user provided enough arguments
 if [ $# -ne 6 ]; then
   echo "Usage: $0 <package_name> <version> <release> <license> <author_name> <author_email>" >&2
@@ -83,6 +75,8 @@ su builder -c "
 echo "✅ Built RPM package"
 
 # Copy RPM to dist directory
-mkdir -p dist
-find /home/builder/rpmbuild/RPMS/ -name '*.rpm' -exec cp {} ./dist/ \;
-echo "📦 Copied RPM package to ./dist/"
+mkdir -p {rpms,srpms}
+find /home/builder/rpmbuild/RPMS/ -name '*.rpm' -exec cp {} ./rpms/ \;
+echo "📦 Copied RPM package to ./rpms/"
+find /home/builder/rpmbuild/SRPMS/ -name '*.src.rpm' -exec cp {} ./srpms/ \;
+echo "📦 Copied SRPM package to ./srpms/"
