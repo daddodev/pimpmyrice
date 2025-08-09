@@ -23,7 +23,7 @@ from pimpmyrice.config_paths import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, 
 from pimpmyrice.exceptions import IfCheckFailed
 from pimpmyrice.files import load_yaml
 from pimpmyrice.logger import current_module
-from pimpmyrice.template import parse_string_vars, process_template
+from pimpmyrice.template import parse_string_vars, render_template_file
 from pimpmyrice.utils import AttrDict, Timer, is_process_running
 
 if TYPE_CHECKING:
@@ -159,9 +159,7 @@ class FileAction(BaseModel):
         if not target.parent.exists():
             target.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(template, "r", encoding="utf-8") as f:
-            data = f.read()
-        processed_data = process_template(data, theme_dict)
+        processed_data = render_template_file(template, theme_dict)
 
         with open(target, "w", encoding="utf-8") as f:
             f.write(processed_data)
@@ -212,7 +210,9 @@ class WaitForAction(BaseModel):
         while modules_state[self.module] in [ModuleState.PENDING, ModuleState.RUNNING]:
             if timer.elapsed > self.timeout:
                 log.error(
-                    f'waiting for module "{self.module}" timed out (>{self.timeout} sec)'
+                    f'waiting for module "{self.module}" timed out (>{
+                        self.timeout
+                    } sec)'
                 )
                 break
             await asyncio.sleep(0.05)
@@ -263,7 +263,9 @@ class LinkAction(BaseModel):
 
         if destination_path.exists():
             raise Exception(
-                f'cannot link destination "{destination_path}" to origin "{origin_path}", destination already exists'
+                f'cannot link destination "{destination_path}" to origin "{
+                    origin_path
+                }", destination already exists'
             )
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(
@@ -299,7 +301,9 @@ class Module(BaseModel):
     ) -> None:
         if command_name not in self.commands:
             raise Exception(
-                f'command "{command_name}" not found in [{", ".join(self.commands.keys())}]'
+                f'command "{command_name}" not found in [{
+                    ", ".join(self.commands.keys())
+                }]'
             )
 
         await self.commands[command_name].run(tm=tm, *args, **kwargs)
@@ -333,7 +337,9 @@ class Module(BaseModel):
 
                 if link_path.exists() or link_path.is_symlink():
                     log.info(
-                        f'skipping linking "{link_path}" to template "{template_path}", destination already exists'
+                        f'skipping linking "{link_path}" to template "{
+                            template_path
+                        }", destination already exists'
                     )
                     continue
 
@@ -477,7 +483,9 @@ async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
 
     if r.returncode != 0:
         raise Exception(
-            f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{url}" not found'
+            f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{
+                url
+            }" not found'
         )
 
     shutil.move(TEMP_DIR / random, dest_dir)

@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 
 import jinja2
@@ -10,6 +11,24 @@ from pimpmyrice.exceptions import ReferenceNotFound
 def process_template(template: str, values: dict[str, Any]) -> str:
     # get_template_keywords(template)
     templ = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(template)
+    rendered: str = templ.render(**values)
+    return rendered
+
+
+def render_template_file(
+    template_path: Path,
+    values: dict[str, Any],
+    search_paths: list[Path] | None = None,
+) -> str:
+    fs_paths: list[Path] = [template_path.parent]
+    if search_paths:
+        fs_paths.extend(search_paths)
+
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(searchpath=[str(p) for p in fs_paths]),
+        undefined=jinja2.StrictUndefined,
+    )
+    templ = env.get_template(template_path.name)
     rendered: str = templ.render(**values)
     return rendered
 
