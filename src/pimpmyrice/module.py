@@ -47,7 +47,7 @@ class ModuleManager:
                 log.debug("exception:", exc_info=e)
                 log.error(f'error loading module "{module_dir.name}": {e}')
 
-        log.debug(f"{len(self.modules)} modules loaded in {timer.elapsed():.4f} sec")
+        log.debug(f"{len(self.modules)} modules loaded in {timer.elapsed:.4f} sec")
 
     def load_module(self, module_dir: Path) -> None:
         module = parse_module(module_dir)
@@ -146,7 +146,7 @@ class ModuleManager:
                         failed += 1
 
             log.info(
-                f"{len(self.modules)} modules finished in {timer.elapsed():.2f} sec: "
+                f"{len(self.modules)} modules finished in {timer.elapsed:.2f} sec: "
                 f"{completed} completed, {skipped} skipped, {failed} failed"
             )
 

@@ -50,7 +50,7 @@ def module_context_wrapper(
         try:
             r = await coro
             modules_state[module_name] = ModuleState.COMPLETED
-            log.info(f"done in {timer.elapsed():.2f} sec")
+            log.info(f"done in {timer.elapsed:.2f} sec")
             return r
         except IfCheckFailed as e:
             modules_state[module_name] = ModuleState.SKIPPED
@@ -210,7 +210,7 @@ class WaitForAction(BaseModel):
         log.debug(f'waiting for module "{self.module}"...')
         timer = Timer()
         while modules_state[self.module] in [ModuleState.PENDING, ModuleState.RUNNING]:
-            if timer.elapsed() > self.timeout:
+            if timer.elapsed > self.timeout:
                 log.error(
                     f'waiting for module "{self.module}" timed out (>{self.timeout} sec)'
                 )

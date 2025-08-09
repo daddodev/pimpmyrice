@@ -50,7 +50,7 @@ class ThemeManager:
             log.exception(e)
             log.error("failed to generate suggestions")
 
-        log.debug(f"ThemeManager initialized in {timer.elapsed():.4f} sec")
+        log.debug(f"ThemeManager initialized in {timer.elapsed:.4f} sec")
 
     def get_config(self) -> ThemeConfig:
         config = ThemeConfig(**load_json(CONFIG_FILE))
@@ -114,7 +114,7 @@ class ThemeManager:
             for tag in theme.tags:
                 self.tags.add(tag)
 
-        log.debug(f"{len(themes)} themes loaded in {timer.elapsed():.4f} sec")
+        log.debug(f"{len(themes)} themes loaded in {timer.elapsed:.4f} sec")
 
         return themes
 
