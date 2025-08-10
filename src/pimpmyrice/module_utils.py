@@ -297,9 +297,7 @@ class Module(BaseModel):
     ) -> None:
         if command_name not in self.commands:
             raise Exception(
-                f'command "{command_name}" not found in [{
-                    ", ".join(self.commands.keys())
-                }]'
+                f'command "{command_name}" not found in [{", ".join(self.commands.keys())}]'
             )
 
         await self.commands[command_name].run(tm=tm, *args, **kwargs)
@@ -333,9 +331,7 @@ class Module(BaseModel):
 
                 if link_path.exists() or link_path.is_symlink():
                     log.info(
-                        f'skipping linking "{link_path}" to template "{
-                            template_path
-                        }", destination already exists'
+                        f'skipping linking "{link_path}" to template "{template_path}", destination already exists'
                     )
                     continue
 
@@ -479,9 +475,7 @@ async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
 
     if r.returncode != 0:
         raise Exception(
-            f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{
-                url
-            }" not found'
+            f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{url}" not found'
         )
 
     shutil.move(TEMP_DIR / random, dest_dir)
