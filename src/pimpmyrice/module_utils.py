@@ -210,9 +210,7 @@ class WaitForAction(BaseModel):
         while modules_state[self.module] in [ModuleState.PENDING, ModuleState.RUNNING]:
             if timer.elapsed > self.timeout:
                 log.error(
-                    f'waiting for module "{self.module}" timed out (>{
-                        self.timeout
-                    } sec)'
+                    f'waiting for module "{self.module}" timed out (>{self.timeout} sec)'
                 )
                 break
             await asyncio.sleep(0.05)
