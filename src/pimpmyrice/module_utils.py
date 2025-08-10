@@ -261,9 +261,7 @@ class LinkAction(BaseModel):
 
         if destination_path.exists():
             raise Exception(
-                f'cannot link destination "{destination_path}" to origin "{
-                    origin_path
-                }", destination already exists'
+                f'cannot link destination "{destination_path}" to origin "{origin_path}", destination already exists'
             )
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(
