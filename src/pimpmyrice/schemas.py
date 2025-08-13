@@ -32,22 +32,68 @@ def create_dynamic_model(name: str, source: dict[str, Any]) -> BaseModel:
     return model
 
 
-def get_fonts(mono: bool = False) -> list[str]:
-    # TODO windows
-    if CLIENT_OS == Os.WINDOWS:
-        log.warning("getting font list not yet supported on Windows")
-        return []
+def get_fonts() -> tuple[list[str], list[str]]:
+    all_families: set[str] = set()
+    mono_families: set[str] = set()
 
     try:
-        output = subprocess.check_output(
-            ["fc-list", ":spacing=mono" if mono else ":family"], text=True
-        )
-        font_names = [line.split(":")[1].strip() for line in output.splitlines()]
-        return sorted(set(font_names))
+        if CLIENT_OS == Os.WINDOWS:
+            ps_script = (
+                "$ErrorActionPreference='SilentlyContinue';"
+                "$f=(New-Object System.Drawing.Text.InstalledFontCollection).Families;"
+                "$f | ForEach-Object { $_.Name } | Sort-Object -Unique"
+            )
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", ps_script],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode != 0 or not proc.stdout:
+                raise Exception("PowerShell font enumeration failed")
 
-    except FileNotFoundError:
-        log.warning("fontconfig not installed")
-        return []
+            for name in proc.stdout.splitlines():
+                name = name.strip()
+                if not name:
+                    continue
+                all_families.add(name)
+                lowered = name.lower()
+                if any(
+                    tok in lowered for tok in ["mono", "code", "console", "courier"]
+                ):
+                    mono_families.add(name)
+        else:
+            proc = subprocess.run(
+                ["fc-list", "-f", "%{family}\t%{spacing}\n"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if proc.returncode != 0 or not proc.stdout:
+                raise Exception("fc-list not available or failed")
+
+            for line in proc.stdout.splitlines():
+                if not line.strip():
+                    continue
+                # family part can be comma-separated aliases
+                try:
+                    family_part, spacing_part = line.split("\t", 1)
+                except ValueError:
+                    family_part, spacing_part = line, "0"
+                families = [f.strip() for f in family_part.split(",") if f.strip()]
+                try:
+                    spacing_val = int(str(spacing_part).strip())
+                except ValueError:
+                    spacing_val = 0
+                for fam in families:
+                    all_families.add(fam)
+                    if spacing_val >= 100:
+                        mono_families.add(fam)
+    except Exception as e:
+        log.debug(f"Font enumeration failed with error: {e!r}")
+
+    log.debug(f"found {len(all_families)} fonts")
+    return list(all_families), list(mono_families)
 
 
 def generate_theme_json_schema(tm: ThemeManager) -> None:
@@ -79,13 +125,13 @@ def generate_theme_json_schema(tm: ThemeManager) -> None:
         "uniqueItems": True,
     }
 
-    normal_fonts = get_fonts()
+    sans_fonts, mono_fonts = get_fonts()
     normal_font_schema = {
         "anyOf": [
             {"type": "string"},
             {
                 "const": "",
-                "enum": normal_fonts,
+                "enum": sans_fonts,
                 "type": "string",
             },
         ],
@@ -93,7 +139,6 @@ def generate_theme_json_schema(tm: ThemeManager) -> None:
         "default": "",
     }
 
-    mono_fonts = get_fonts(mono=True)
     mono_font_schema = {
         "anyOf": [
             {"type": "string"},

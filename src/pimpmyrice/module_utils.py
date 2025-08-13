@@ -185,11 +185,11 @@ class PythonAction(BaseModel):
 
         fn = get_func_from_py_file(file_path, self.function_name)
 
-        log.debug(f"{file_path}:{self.function_name} loaded")
+        log.debug(f"{file_path}: {self.function_name} loaded")
 
         res = await fn(*args, **kwargs)
 
-        log.debug(f"{file_path.name}:{self.function_name} returned:\n{res}")
+        log.debug(f"{file_path.name}: {self.function_name} returned:\n{res}")
 
         return res
 
@@ -274,12 +274,8 @@ class LinkAction(BaseModel):
 
 
 ModuleInit = Union[LinkAction]
-
 ModulePreRun = Union[PythonAction]
-
-
 ModuleRun = Union[ShellAction, FileAction, PythonAction, IfRunningAction, WaitForAction]
-
 ModuleCommand = Union[PythonAction]
 
 

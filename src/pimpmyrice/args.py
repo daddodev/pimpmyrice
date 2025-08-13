@@ -157,6 +157,8 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
         msg = f"""🍙 PimpMyRice {version("pimpmyrice")}
 name: {tm.config.theme}
 mode: {tm.config.mode}
+themes: {len(tm.themes)}
+modules: {len(tm.mm.modules)}
 """
 
         log.info(msg)

@@ -197,7 +197,8 @@ class ModuleManager:
             run=[
                 IfRunningAction(module_name=module_name, program_name="someprogram"),
                 FileAction(
-                    module_name=module_name, target="{{config_dir}}/someprogram/config"
+                    module_name=module_name,
+                    target="{{module_dir}}/example_output/config",
                 ),
                 ShellAction(module_name=module_name, command="somecommand"),
                 PythonAction(
