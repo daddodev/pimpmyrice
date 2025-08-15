@@ -133,6 +133,8 @@ def dump_theme_for_file(theme: Theme) -> dict[str, Any]:
     if not dump["tags"]:
         dump.pop("tags")
 
+    dump.pop("last_modified")
+
     # print("dump for file:", json.dumps(dump, indent=4))
     return dump
 
