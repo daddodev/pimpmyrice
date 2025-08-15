@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import colorsys
 import logging
-import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,19 +17,27 @@ log = logging.getLogger(__name__)
 
 class Color:
     _rgba: tuple[float, float, float, float]
-    _original: str | Color
 
-    def __init__(self, value: str | "Color") -> None:
-        if isinstance(value, str):
+    def __init__(self, value: str | tuple[int, ...] | "Color") -> None:
+        if isinstance(value, tuple):
+            self._rgba = self._parse_rgb_tuple(value)
+        elif isinstance(value, str):
             self._rgba = self._parse_str(value.strip())
-            self._original = value
         elif isinstance(value, Color):
             self._rgba = value._rgba
-            self._original = value._original
         else:
             raise ValueError(
                 "value is not a valid color: value must be a string or Color()"
             )
+
+    @staticmethod
+    def _parse_rgb_tuple(value: tuple[int, ...]) -> tuple[float, float, float, float]:
+        r = value[0] / 255
+        g = value[1] / 255
+        b = value[2] / 255
+        a = (value[3]) if len(value) > 3 else 1.0
+
+        return r, g, b, a
 
     @staticmethod
     def _parse_str(value: str) -> tuple[float, float, float, float]:
@@ -118,17 +125,17 @@ class Color:
 
     def hex_tuple(self, alpha: bool = False) -> tuple[str, ...]:
         return tuple(
-            f"{hex(int(x*255))[2:]:0>2}"
+            f"{hex(int(x * 255))[2:]:0>2}"
             for x in (self._rgba if alpha else self._rgba[:3])
         )
 
     @property
     def rgb(self) -> str:
-        return f"rgb({', '.join([str(int(v*255)) for v in self._rgba[:3]])})"
+        return f"rgb({', '.join([str(int(v * 255)) for v in self._rgba[:3]])})"
 
     @property
     def rgba(self) -> str:
-        return f"rgba({', '.join([str(int(v*255)) for v in self._rgba])})"
+        return f"rgba({', '.join([str(int(v * 255)) for v in self._rgba])})"
 
     def rgb_tuple(self, alpha: bool = False) -> tuple[float, ...]:
         return self._rgba if alpha else self._rgba[:3]
