@@ -14,6 +14,16 @@ log = logging.getLogger(__name__)
 def parse_wallpaper(
     wallpaper: Union[dict[str, Any], str], theme_path: Path
 ) -> Wallpaper:
+    """
+    Parse a wallpaper entry into a `Wallpaper` model.
+
+    Args:
+        wallpaper (dict[str, Any] | str): Wallpaper config or relative path.
+        theme_path (Path): Theme directory used to resolve relative paths.
+
+    Returns:
+        Wallpaper: Parsed wallpaper model.
+    """
     match wallpaper:
         case str(wallpaper):
             return Wallpaper(path=theme_path / wallpaper)
@@ -26,6 +36,15 @@ def parse_wallpaper(
 def parse_theme(
     path: Path,
 ) -> Theme:
+    """
+    Parse a theme directory (theme.json + assets) into a `Theme` model.
+
+    Args:
+        path (Path): Theme directory path.
+
+    Returns:
+        Theme: Parsed theme model.
+    """
     name = path.name
     theme_file = path / "theme.json"
 
@@ -50,6 +69,15 @@ def parse_theme(
 
 
 def parse_module(module_path: Path) -> Module:
+    """
+    Parse a module directory from YAML/JSON definition into a `Module`.
+
+    Args:
+        module_path (Path): Module directory path.
+
+    Returns:
+        Module: Parsed module model.
+    """
     module_name = module_path.name
     module_yaml = module_path / "module.yaml"
     module_json = module_path / "module.json"

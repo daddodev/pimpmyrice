@@ -130,18 +130,12 @@ _{cmd_name} ()
 
 
 class CommandParams:
-    """Contains command options, arguments, and subcommands.
+    """
+    Command parameters: options, arguments, and subcommands.
 
-    Options are optional arguments like "-v", "-h", etc.
-
-    Arguments are required arguments like file paths, etc.
-
-    Subcommands are optional keywords, like the "status" in "git status".
-    Subcommands have their own CommandParams instance, so the "status" in "git status" can
-    have its own options, arguments, and subcommands.
-
-    This way, we can describe commands like "git remote add origin --fetch" with all the different
-    options at each level.
+    - Options: optional flags like "-v" or "--help".
+    - Arguments: positional values like file paths.
+    - Subcommands: nested verbs like the "status" in "git status".
     """
 
     def __init__(self) -> None:
@@ -173,7 +167,14 @@ class DocoptCompletionException(Exception):
 
 def build_command_tree(pattern: Any, cmd_params: "CommandParams") -> "CommandParams":
     """
-    Recursively fill in a command tree in cmd_params according to a docopt-parsed "pattern" object.
+    Recursively fill command tree from a docopt pattern object.
+
+    Args:
+        pattern (Any): Parsed docopt pattern.
+        cmd_params (CommandParams): Tree to populate.
+
+    Returns:
+        CommandParams: The populated command tree.
     """
     if type(pattern) in [Either, Optional, OneOrMore]:
         for child in pattern.children:
@@ -196,11 +197,16 @@ def build_command_tree(pattern: Any, cmd_params: "CommandParams") -> "CommandPar
 
 def get_usage(cmd: str) -> str:
     """
-    Runs a command with --help and extracts its usage description.
+    Run a command with --help and extract its usage.
 
-    :param cmd: Command to execute.
-    :return: Usage string extracted from the command's help output.
-    :raises: DocoptCompletionException if the command execution fails or returns an error code.
+    Args:
+        cmd (str): Command to execute.
+
+    Returns:
+        str: Usage string.
+
+    Raises:
+        DocoptCompletionException: If execution fails or returns non-zero.
     """
     error_message = f"Failed to run '{cmd} --help'"
     try:
@@ -224,10 +230,13 @@ def get_usage(cmd: str) -> str:
 
 def get_options_descriptions(doc: str) -> Generator[tuple[str, str], None, None]:
     """
-    Extracts option descriptions from the docopt documentation string.
+    Extract option descriptions from a docopt document.
 
-    :param doc: Documentation string from which to parse options.
-    :return: A generator yielding tuples of (option, description).
+    Args:
+        doc (str): Docopt documentation string.
+
+    Returns:
+        Generator[tuple[str, str], None, None]: (option, description) pairs.
     """
 
     def sanitize_line(line: str) -> str:
@@ -250,11 +259,13 @@ def get_options_descriptions(doc: str) -> Generator[tuple[str, str], None, None]
 
 def parse_params(cmd: str) -> tuple["CommandParams", dict[str, str]]:
     """
-    Creates a parameter tree (CommandParams object) for the target docopt tool.
-    Also parses a mapping of options to their help descriptions.
+    Build a parameter tree and option descriptions for a command.
 
-    :param cmd: The command to parse.
-    :return: A tuple containing the CommandParams object and a dictionary of option descriptions.
+    Args:
+        cmd (str): Command to inspect.
+
+    Returns:
+        tuple[CommandParams, dict[str, str]]: Tree and option help mapping.
     """
     usage = get_usage(cmd)
     options = parse_defaults(usage)
@@ -312,7 +323,7 @@ class CompletionGenerator:
 
 
 class ZshCompletion(CompletionGenerator):
-    """Base class for generating ZSH completion files"""
+    """Base class for generating ZSH completion files."""
 
     def get_completion_path(self) -> str:
         return "."
@@ -438,6 +449,17 @@ class OhMyZshCompletion(ZshCompletion):
 
 
 def add_zsh_suggestions(file_content: str, arg_name: str, values: list[str]) -> str:
+    """
+    Inject custom completion suggestions into a zsh completion file.
+
+    Args:
+        file_content (str): Existing completion file content.
+        arg_name (str): Argument or option name to augment.
+        values (list[str]): Suggested values.
+
+    Returns:
+        str: Modified completion content.
+    """
     if arg_name == "--tags":
         replaced = ""
 
@@ -486,6 +508,15 @@ def add_zsh_suggestions(file_content: str, arg_name: str, values: list[str]) -> 
 
 
 def generate_shell_suggestions(tm: ThemeManager) -> None:
+    """
+    Generate and write zsh completion file for the `pimp` CLI.
+
+    Args:
+        tm (ThemeManager): Theme manager with data used for suggestions.
+
+    Returns:
+        None
+    """
     file_path = HOME_DIR / ".cache/oh-my-zsh/completions/_pimp"
 
     file_path.parent.mkdir(parents=True, exist_ok=True)

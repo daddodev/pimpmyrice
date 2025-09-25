@@ -9,6 +9,16 @@ from pimpmyrice.exceptions import ReferenceNotFound
 
 
 def process_template(template: str, values: dict[str, Any]) -> str:
+    """
+    Render a Jinja2 template string with strict undefined.
+
+    Args:
+        template (str): Template string.
+        values (dict[str, Any]): Variables to render into the template.
+
+    Returns:
+        str: Rendered string.
+    """
     # get_template_keywords(template)
     templ = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(template)
     rendered: str = templ.render(**values)
@@ -20,6 +30,17 @@ def render_template_file(
     values: dict[str, Any],
     search_paths: list[Path] | None = None,
 ) -> str:
+    """
+    Render a Jinja2 template file with optional search paths.
+
+    Args:
+        template_path (Path): Template file path.
+        values (dict[str, Any]): Variables to render.
+        search_paths (list[Path] | None): Additional template search paths.
+
+    Returns:
+        str: Rendered output.
+    """
     fs_paths: list[Path] = [template_path.parent]
     if search_paths:
         fs_paths.extend(search_paths)
@@ -34,6 +55,19 @@ def render_template_file(
 
 
 def process_keyword_template(value: str, theme_map: dict[str, Any]) -> Any:
+    """
+    Evaluate a single Jinja2 expression and return its value.
+
+    Args:
+        value (str): Template expression inside "{{ ... }}".
+        theme_map (dict[str, Any]): Variables for evaluation.
+
+    Returns:
+        Any: Evaluated value.
+
+    Raises:
+        ReferenceNotFound: If the result is still an unresolved Jinja2 variable.
+    """
     output: list[Any] = []
 
     def capture_j2_var(v: Any) -> Any:
@@ -55,6 +89,17 @@ def parse_string_vars(
     theme_dict: dict[str, Any] | None = None,
     module_name: str | None = None,
 ) -> str:
+    """
+    Expand variables and user paths in a string.
+
+    Args:
+        string (str): Input string possibly containing template vars.
+        theme_dict (dict[str, Any] | None): Extra variables. Defaults to None.
+        module_name (str | None): Module context for dir paths. Defaults to None.
+
+    Returns:
+        str: Expanded string.
+    """
     # TODO capitalize
 
     d = {

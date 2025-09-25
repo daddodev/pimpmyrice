@@ -34,6 +34,12 @@ PaletteGeneratorType = Callable[[Path], Awaitable[Palette]]
 
 
 def get_palette_generators() -> dict[str, PaletteGeneratorType]:
+    """
+    Discover built-in and user-provided palette generators.
+
+    Returns:
+        dict[str, PaletteGeneratorType]: Map of generator name to async function.
+    """
     generators: dict[str, PaletteGeneratorType] = {
         "dark": dark_generator,
         "light": light_generator,
@@ -54,11 +60,13 @@ def get_palette_generators() -> dict[str, PaletteGeneratorType]:
 
 
 class ThemeConfig(BaseModel):
+    """User configuration for theme selection and mode."""
     theme: str | None = None
     mode: str = "dark"
 
 
 class Mode(BaseModel):
+    """Theme mode configuration (palette, wallpaper, and style)."""
     name: SkipJsonSchema[str] = Field(exclude=True)
     palette: LinkPalette | Palette
     wallpaper: Wallpaper | None = None
@@ -66,25 +74,35 @@ class Mode(BaseModel):
 
 
 class WallpaperMode(str, Enum):
+    """Wallpaper fit behavior for the display."""
     FILL = "fill"
     FIT = "fit"
 
     def __str__(self) -> str:
+        """Return string value (for serialization/logging)."""
         return self.value
 
 
 class Wallpaper(BaseModel):
+    """Wallpaper resource and display mode."""
     path: Path
     mode: WallpaperMode = WallpaperMode.FILL
 
     @computed_field  # type: ignore
     @property
     def thumb(self) -> Path:
+        """
+        Thumbnail path for the wallpaper.
+
+        Returns:
+            Path: Path to generated thumbnail image.
+        """
         t = get_thumbnail(self.path)
         return t
 
 
 class Theme(BaseModel):
+    """Theme definition: composition of modes, style and metadata."""
     path: Path = Field()
     name: str = Field()
     wallpaper: Wallpaper
@@ -95,12 +113,22 @@ class Theme(BaseModel):
 
     @validator("tags", pre=True)
     def coerce_to_set(cls, value: Any) -> Any:  # pylint: disable=no-self-argument
+        """Ensure tags are stored as a set when parsing from JSON/YAML."""
         if isinstance(value, list):
             return set(value)
         return value
 
 
 def dump_theme_for_file(theme: Theme) -> dict[str, Any]:
+    """
+    Serialize a theme for file storage (prune defaults and derived fields).
+
+    Args:
+        theme (Theme): Theme to serialize.
+
+    Returns:
+        dict[str, Any]: Cleaned theme representation suitable for file output.
+    """
     dump = theme.model_dump(
         mode="json",
         exclude={
@@ -145,6 +173,18 @@ async def gen_from_img(
     generators: dict[str, PaletteGeneratorType],
     name: str | None = None,
 ) -> Theme:
+    """
+    Generate a theme by running all palette generators on an image.
+
+    Args:
+        image (Path): Source image path.
+        themes (dict[str, Theme]): Existing themes (for name de-duplication).
+        generators (dict[str, PaletteGeneratorType]): Palette generator functions.
+        name (str | None): Optional theme name override.
+
+    Returns:
+        Theme: Newly generated theme with modes and palettes.
+    """
     if not image.is_file():
         raise FileNotFoundError(f'image not found at "{image}"')
 
@@ -170,6 +210,16 @@ async def gen_from_img(
 def resolve_refs(
     data: DictOrAttrDict, theme_dict: DictOrAttrDict | None = None
 ) -> Tuple[DictOrAttrDict, list[str]]:
+    """
+    Resolve template references recursively in a dict-like structure.
+
+    Args:
+        data (DictOrAttrDict): Data with potential "{{...}}" references.
+        theme_dict (DictOrAttrDict | None): Context for resolving references.
+
+    Returns:
+        tuple[DictOrAttrDict, list[str]]: Resolved data and list of unresolved keys.
+    """
     if not theme_dict:
         theme_dict = deepcopy(data)
 
@@ -197,6 +247,19 @@ def gen_theme_dict(
     palette_name: str | None = None,
     styles_names: list[str] | None = None,
 ) -> AttrDict:
+    """
+    Build the final theme dictionary to feed modules.
+
+    Args:
+        tm (ThemeManager): Theme manager instance.
+        theme_name (str): Theme name.
+        mode_name (str): Mode to apply.
+        palette_name (str | None): Palette override. Defaults to None.
+        styles_names (list[str] | None): Extra global styles to merge.
+
+    Returns:
+        AttrDict: Theme data including palette, wallpaper, mode, and styles.
+    """
     theme = tm.themes[theme_name]
 
     if mode_name not in theme.modes:
@@ -293,6 +356,16 @@ def gen_theme_dict(
 
 
 def valid_theme_name(name: str, themes: dict[str, Theme]) -> str:
+    """
+    Sanitize and de-duplicate a string for use as a theme name.
+
+    Args:
+        name (str): Desired theme name.
+        themes (dict[str, Theme]): Existing themes to avoid collisions.
+
+    Returns:
+        str: Safe, unique theme name.
+    """
     whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
     char_limit = 20
     cleaned_filename = (
@@ -310,6 +383,16 @@ def valid_theme_name(name: str, themes: dict[str, Theme]) -> str:
 
 
 def import_image(wallpaper: Path, theme_dir: Path) -> Path:
+    """
+    Ensure a wallpaper image resides in the theme directory.
+
+    Args:
+        wallpaper (Path): Path to the wallpaper image.
+        theme_dir (Path): Theme directory where the image should live.
+
+    Returns:
+        Path: Path to the wallpaper inside `theme_dir`.
+    """
     if wallpaper.parent != theme_dir and not (theme_dir / wallpaper.name).exists():
         wallpaper = files.import_image(wallpaper, theme_dir)
     return theme_dir / wallpaper.name

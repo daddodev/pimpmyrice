@@ -18,6 +18,18 @@ def kmeans(
     max_iter: int = 100,
     tol: float = 1e-4,
 ) -> list[tuple[tuple[int, int, int], int]]:
+    """
+    K-means over RGB pixels returning cluster centers and sizes.
+
+    Args:
+        pixels (NDArray[np.uint8]): Array of RGB pixels.
+        num_clusters (int): Number of clusters. Defaults to 6.
+        max_iter (int): Max iterations. Defaults to 100.
+        tol (float): Convergence threshold. Defaults to 1e-4.
+
+    Returns:
+        list[tuple[tuple[int, int, int], int]]: (center RGB, count) pairs.
+    """
     np.random.seed(42)
     indices = np.random.choice(len(pixels), num_clusters, replace=False)
     cluster_centers = pixels[indices]
@@ -59,6 +71,17 @@ def kmeans(
 def extract_colors(
     image_path: Path, num_colors: int = 6, resize_to_size: int = 300
 ) -> list[tuple[Color, int]]:
+    """
+    Extract dominant colors from an image using k-means.
+
+    Args:
+        image_path (Path): Path to the image.
+        num_colors (int): Number of colors to extract. Defaults to 6.
+        resize_to_size (int): Resize longest side to this many px. Defaults to 300.
+
+    Returns:
+        list[tuple[Color, int]]: Colors and their approximate counts.
+    """
     img = Image.open(image_path).convert("RGB")
 
     width, height = img.size

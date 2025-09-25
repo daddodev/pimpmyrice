@@ -7,6 +7,7 @@ log = logging.getLogger(__name__)
 
 
 def main() -> None:
+    """Entrypoint for the `pimp` CLI."""
     try:
         asyncio.run(cli())
     except KeyboardInterrupt:

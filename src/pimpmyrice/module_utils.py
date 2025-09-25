@@ -33,6 +33,7 @@ log = logging.getLogger(__name__)
 
 
 class ModuleState(Enum):
+    """Execution state for a module action pipeline."""
     PENDING = auto()
     RUNNING = auto()
     COMPLETED = auto()
@@ -43,6 +44,17 @@ class ModuleState(Enum):
 def module_context_wrapper(
     module_name: str, modules_state: dict[str, ModuleState], coro: Awaitable[Any]
 ) -> Coroutine[Any, Any, Any]:
+    """
+    Wrap a coroutine to track and log module execution state and timing.
+
+    Args:
+        module_name (str): Module name being executed.
+        modules_state (dict[str, ModuleState]): Shared state map to update.
+        coro (Awaitable[Any]): Awaitable to execute.
+
+    Returns:
+        Coroutine[Any, Any, Any]: Wrapped coroutine that manages state.
+    """
     async def wrapped() -> Any:
         timer = Timer()
         token = current_module.set(module_name)
@@ -69,6 +81,16 @@ def add_action_type_to_schema(
     action_type: str,
     schema: dict[str, Any],
 ) -> None:
+    """
+    Mutate a JSON schema to include the action discriminator field.
+
+    Args:
+        action_type (str): Discriminator value to set.
+        schema (dict[str, Any]): Schema to mutate in place.
+
+    Returns:
+        None
+    """
     schema["properties"]["action"] = {
         "title": "Action type",
         "type": "string",
@@ -78,6 +100,7 @@ def add_action_type_to_schema(
 
 
 class ShellAction(BaseModel):
+    """Execute a shell command, optionally detached."""
     action: Literal["shell"] = Field(default="shell")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     command: str
@@ -88,6 +111,15 @@ class ShellAction(BaseModel):
     )
 
     async def run(self, theme_dict: AttrDict) -> None:
+        """
+        Render and execute the shell command.
+
+        Args:
+            theme_dict (AttrDict): Theme dictionary to render placeholders.
+
+        Returns:
+            None
+        """
         cmd = parse_string_vars(
             string=self.command,
             module_name=self.module_name,
@@ -115,6 +147,7 @@ class ShellAction(BaseModel):
 
 
 class FileAction(BaseModel):
+    """Render a template file and write it to a target path."""
     action: Literal["file"] = Field(default="file")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     target: str
@@ -127,12 +160,31 @@ class FileAction(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def set_fields(cls, data: Any) -> Any:
+        """
+        Default `template` to `<target-filename>.j2` if not explicitly set.
+
+        Args:
+            data (Any): Raw model input data.
+
+        Returns:
+            Any: Possibly augmented data.
+        """
         if "target" in data and "template" not in data:
             template_path = f"{Path(data['target']).name}.j2"
             data["template"] = template_path
         return data
 
     async def run(self, theme_dict: AttrDict, out_dir: Path | None = None) -> None:
+        """
+        Render the module template and write it to the computed target path.
+
+        Args:
+            theme_dict (AttrDict): Theme dictionary used for rendering.
+            out_dir (Path | None): Optional base directory for output.
+
+        Returns:
+            None
+        """
         template = Path(
             parse_string_vars(
                 string=str(
@@ -168,6 +220,7 @@ class FileAction(BaseModel):
 
 
 class PythonAction(BaseModel):
+    """Invoke an async Python function from a module file."""
     action: Literal["python"] = Field(default="python")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     py_file_path: str
@@ -178,6 +231,16 @@ class PythonAction(BaseModel):
     )
 
     async def run(self, *args: Any, **kwargs: Any) -> Any:
+        """
+        Load and invoke the configured async function.
+
+        Args:
+            *args (Any): Positional arguments for the function.
+            **kwargs (Any): Keyword arguments for the function.
+
+        Returns:
+            Any: Result returned by the function.
+        """
         file_path = Path(self.py_file_path)
 
         if not file_path.is_absolute():
@@ -195,6 +258,7 @@ class PythonAction(BaseModel):
 
 
 class WaitForAction(BaseModel):
+    """Pause until another module reaches a terminal state or timeout expires."""
     action: Literal["wait_for"] = Field(default="wait_for")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     module: str
@@ -205,6 +269,16 @@ class WaitForAction(BaseModel):
     )
 
     async def run(self, _: AttrDict, modules_state: dict[str, Any]) -> None:
+        """
+        Wait until the referenced module finishes or timeout is reached.
+
+        Args:
+            _ (AttrDict): Unused theme dictionary.
+            modules_state (dict[str, Any]): Shared modules state.
+
+        Returns:
+            None
+        """
         log.debug(f'waiting for module "{self.module}"...')
         timer = Timer()
         while modules_state[self.module] in [ModuleState.PENDING, ModuleState.RUNNING]:
@@ -222,6 +296,7 @@ class WaitForAction(BaseModel):
 
 
 class IfRunningAction(BaseModel):
+    """Conditionally gate execution based on a process running/not running."""
     action: Literal["if_running"] = Field(default="if_running")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     program_name: str
@@ -232,15 +307,26 @@ class IfRunningAction(BaseModel):
     )
 
     async def run(self, _: AttrDict) -> None:
+        """
+        Check if `program_name` state matches `should_be_running`.
+
+        Args:
+            _ (AttrDict): Unused theme dictionary.
+
+        Returns:
+            None
+        """
         running = is_process_running(self.program_name)
         if self.should_be_running != running:
             raise IfCheckFailed(f"{self.__str__()} returned false")
 
     def __str__(self) -> str:
+        """Human-readable description of the running check."""
         return f'if "{self.program_name}" {"running" if self.should_be_running else "not running"}'
 
 
 class LinkAction(BaseModel):
+    """Create a symbolic link from module-managed origin to destination."""
     action: Literal["link"] = Field(default="link")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     origin: str
@@ -251,6 +337,12 @@ class LinkAction(BaseModel):
     )
 
     async def run(self) -> None:
+        """
+        Create the symlink, ensuring destination does not already exist.
+
+        Returns:
+            None
+        """
         origin_path = Path(parse_string_vars(self.origin, module_name=self.module_name))
         destination_path = Path(
             parse_string_vars(self.destination, module_name=self.module_name)
@@ -280,6 +372,7 @@ ModuleCommand = Union[PythonAction]
 
 
 class Module(BaseModel):
+    """Module definition and execution helpers for actions and commands."""
     name: SkipJsonSchema[str] = Field(exclude=True)
     enabled: bool = True
     os: list[Os] = list(Os)
@@ -291,6 +384,18 @@ class Module(BaseModel):
     async def execute_command(
         self, command_name: str, tm: ThemeManager, *args: Any, **kwargs: Any
     ) -> None:
+        """
+        Execute a named command defined in the module.
+
+        Args:
+            command_name (str): Command key.
+            tm (ThemeManager): Theme manager instance.
+            *args (Any): Positional arguments for the command.
+            **kwargs (Any): Keyword arguments for the command.
+
+        Returns:
+            None
+        """
         if command_name not in self.commands:
             raise Exception(
                 f'command "{command_name}" not found in [{", ".join(self.commands.keys())}]'
@@ -299,6 +404,12 @@ class Module(BaseModel):
         await self.commands[command_name].run(tm=tm, *args, **kwargs)
 
     async def execute_init(self) -> None:
+        """
+        Run initialization actions and set up file/template links.
+
+        Returns:
+            None
+        """
         for init_action in self.init:
             await init_action.run()
 
@@ -338,6 +449,15 @@ class Module(BaseModel):
         log.info(f'module "{self.name}" initialized')
 
     async def execute_pre_run(self, theme_dict: AttrDict) -> AttrDict:
+        """
+        Run pre-run actions and allow them to transform the theme dict.
+
+        Args:
+            theme_dict (AttrDict): Input theme dictionary.
+
+        Returns:
+            AttrDict: Possibly modified theme dictionary.
+        """
         for action in self.pre_run:
             action_res = await action.run(theme_dict)
             theme_dict = action_res
@@ -350,6 +470,17 @@ class Module(BaseModel):
         modules_state: dict[str, Any],
         out_dir: Path | None = None,
     ) -> None:
+        """
+        Run main actions (and waits) for the module.
+
+        Args:
+            theme_dict (AttrDict): Theme data for rendering/actions.
+            modules_state (dict[str, Any]): Shared state for coordination.
+            out_dir (Path | None): If set, dump outputs instead of applying.
+
+        Returns:
+            None
+        """
         # get_module_dict
         theme_dict = (
             theme_dict + theme_dict["modules_styles"][self.name]
@@ -375,6 +506,16 @@ class Module(BaseModel):
 
 
 def get_func_from_py_file(py_file: Path, func_name: str) -> Any:
+    """
+    Load a function object by name from a Python file.
+
+    Args:
+        py_file (Path): Path to the Python source file.
+        func_name (str): Function name to retrieve.
+
+    Returns:
+        Any: Loaded function object.
+    """
     spec = importlib.util.spec_from_file_location(f"pimp_imported_{py_file}", py_file)
     if not spec or not spec.loader:
         raise ImportError(f'could not load "{py_file}"')
@@ -387,6 +528,16 @@ def get_func_from_py_file(py_file: Path, func_name: str) -> Any:
 
 
 def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
+    """
+    Start a shell command in the background without waiting for it.
+
+    Args:
+        command (str): Command string to execute.
+        cwd (Path | None): Working directory. Defaults to None.
+
+    Returns:
+        None
+    """
     if sys.platform == "win32":
         subprocess.Popen(
             shlex.split(command),
@@ -406,12 +557,23 @@ def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
 
 @dataclass
 class ShellResponse:
+    """Captured result of a shell command execution."""
     out: str
     err: str
     returncode: int
 
 
 async def run_shell_command(command: str, cwd: Path | None = None) -> ShellResponse:
+    """
+    Run a shell command asynchronously and capture output.
+
+    Args:
+        command (str): Command string to execute.
+        cwd (Path | None): Working directory. Defaults to None.
+
+    Returns:
+        ShellResponse: Stdout, stderr, and return code.
+    """
     proc = await asyncio.create_subprocess_shell(
         command,
         stdout=asyncio.subprocess.PIPE,
@@ -433,11 +595,30 @@ async def run_shell_command(command: str, cwd: Path | None = None) -> ShellRespo
 
 
 def load_module_conf(module_name: str) -> dict[str, Any]:
+    """
+    Load `conf.yaml` for a module (from `$MODULES_DIR/$MODULE_NAME/conf.yaml`).
+
+    Args:
+        module_name (str): Module name.
+
+    Returns:
+        dict[str, Any]: Parsed YAML configuration.
+    """
     data = load_yaml(MODULES_DIR / module_name / "conf.yaml")
     return data
 
 
 async def clone_from_folder(source: Path, out_dir: Path = MODULES_DIR) -> str:
+    """
+    Clone a module from a local directory.
+
+    Args:
+        source (Path): Source directory with a module manifest.
+        out_dir (Path): Destination modules directory. Defaults to MODULES_DIR.
+
+    Returns:
+        str: New module name.
+    """
     if not (source / "module.yaml").exists():
         raise Exception(f'module not found at "{source.absolute()}"')
 
@@ -451,6 +632,16 @@ async def clone_from_folder(source: Path, out_dir: Path = MODULES_DIR) -> str:
 
 
 async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
+    """
+    Clone a module from a Git repository.
+
+    Args:
+        url (str): Git URL.
+        out_dir (Path): Destination modules directory. Defaults to MODULES_DIR.
+
+    Returns:
+        str: New module name.
+    """
     name = url.split("/")[-1].removesuffix(".git")
     dest_dir = out_dir / name
     if dest_dir.exists():
@@ -480,5 +671,14 @@ async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
 
 
 async def delete_module(module: Module) -> None:
+    """
+    Remove a module directory and all its contents.
+
+    Args:
+        module (Module): Module to delete.
+
+    Returns:
+        None
+    """
     path = MODULES_DIR / module.name
     shutil.rmtree(path)

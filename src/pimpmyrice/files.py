@@ -26,6 +26,15 @@ log = logging.getLogger(__name__)
 
 
 def load_yaml(file: Path) -> dict[str, Any]:
+    """
+    Load a YAML file into a dict.
+
+    Args:
+        file (Path): Path to YAML file.
+
+    Returns:
+        dict[str, Any]: Parsed data.
+    """
     with open(file, encoding="utf-8") as f:
         data = yaml.load(f, Loader=yaml.Loader)
         if data is None:
@@ -38,6 +47,16 @@ def load_yaml(file: Path) -> dict[str, Any]:
 
 
 def save_yaml(file: Path, data: dict[str, Any]) -> None:
+    """
+    Save a dict to YAML; add $schema header if available.
+
+    Args:
+        file (Path): Output path.
+        data (dict[str, Any]): Data to serialize.
+
+    Returns:
+        None
+    """
     dump = yaml.dump(data, indent=4, default_flow_style=False)
 
     schema_file = JSON_SCHEMA_DIR / f"{file.stem}.json"
@@ -50,6 +69,15 @@ def save_yaml(file: Path, data: dict[str, Any]) -> None:
 
 
 def load_json(file: Path) -> dict[str, Any]:
+    """
+    Load a JSON file into a dict and strip $schema.
+
+    Args:
+        file (Path): Path to JSON file.
+
+    Returns:
+        dict[str, Any]: Parsed data.
+    """
     with open(file, encoding="utf-8") as f:
         data = json.load(f)
 
@@ -62,16 +90,37 @@ def load_json(file: Path) -> dict[str, Any]:
 
 
 def save_json(file: Path, data: dict[str, Any]) -> None:
+    """
+    Save a dict to JSON; embed $schema relative path if present.
+
+    Args:
+        file (Path): Output path.
+        data (dict[str, Any]): Data to serialize.
+
+    Returns:
+        None
+    """
+    dump = json.dumps(data, indent=4)
+
     schema_file = JSON_SCHEMA_DIR / file.name
     if schema_file.exists():
         data["$schema"] = os.path.relpath(schema_file, file.parent)
 
-    dump = json.dumps(data, indent=4)
     with open(file, "w", encoding="utf-8") as f:
         f.write(dump)
 
 
 def import_image(image_path: Path, theme_dir: Path) -> Path:
+    """
+    Copy an image into a theme directory.
+
+    Args:
+        image_path (Path): Source image path.
+        theme_dir (Path): Destination theme directory.
+
+    Returns:
+        Path: Destination file path.
+    """
     if (
         not image_path.exists() or not image_path.is_file()
     ):  # to do: process files/folders
@@ -87,6 +136,12 @@ def import_image(image_path: Path, theme_dir: Path) -> Path:
 
 
 def create_config_dirs() -> None:
+    """
+    Ensure config directories and default files exist.
+
+    Returns:
+        None
+    """
     for dir in [
         THEMES_DIR,
         STYLES_DIR,
@@ -115,6 +170,16 @@ def create_config_dirs() -> None:
 
 
 def download_file(url: str, destination: Path = TEMP_DIR) -> Path:
+    """
+    Download a file to a destination directory, guessing extension.
+
+    Args:
+        url (str): HTTP(S) URL.
+        destination (Path): Destination dir. Defaults to TEMP_DIR.
+
+    Returns:
+        Path: Path to downloaded file.
+    """
     # TODO better filename
 
     import requests

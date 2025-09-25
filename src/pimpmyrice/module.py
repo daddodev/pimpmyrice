@@ -28,11 +28,23 @@ log = logging.getLogger(__name__)
 
 
 class ModuleManager:
+    """
+    Manage discovery, lifecycle, and execution of modules.
+
+    Loads modules from disk, runs their pre-run/run actions, and provides
+    helpers for install, clone, init, rewrite, and deletion.
+    """
     def __init__(self) -> None:
         self.modules: dict[str, Module] = {}
         self.load_modules()
 
     def load_modules(self) -> None:
+        """
+        Load all modules present in `MODULES_DIR`.
+
+        Returns:
+            None
+        """
         timer = Timer()
 
         for module_dir in MODULES_DIR.iterdir():
@@ -50,6 +62,15 @@ class ModuleManager:
         log.debug(f"{len(self.modules)} modules loaded in {timer.elapsed:.4f} sec")
 
     def load_module(self, module_dir: Path) -> None:
+        """
+        Load a single module from a directory.
+
+        Args:
+            module_dir (Path): Path containing a module manifest.
+
+        Returns:
+            None
+        """
         module = parse_module(module_dir)
 
         self.modules[module.name] = module
@@ -62,6 +83,18 @@ class ModuleManager:
         exclude_modules: list[str] | None = None,
         out_dir: Path | None = None,
     ) -> dict[str, ModuleState]:
+        """
+        Run pre-run and run actions for eligible modules.
+
+        Args:
+            theme_dict (AttrDict): Generated theme dictionary.
+            include_modules (list[str] | None): Allowlist of module names.
+            exclude_modules (list[str] | None): Denylist of module names.
+            out_dir (Path | None): Optional output directory for exports.
+
+        Returns:
+            dict[str, ModuleState]: Final state of each module.
+        """
         # TODO separate modules by type (run, pre_run, palette_generators...)
 
         if is_locked(LOCK_FILE)[0]:
@@ -163,6 +196,19 @@ class ModuleManager:
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        """
+        Execute a custom command exposed by a module.
+
+        Args:
+            tm (ThemeManager): Theme manager instance.
+            module_name (str): Target module.
+            command (str): Command name.
+            *args (Any): Positional arguments passed to the command.
+            **kwargs (Any): Keyword arguments passed to the command.
+
+        Returns:
+            None
+        """
         if module_name not in self.modules:
             raise Exception(f'module "{module_name}" not found')
 
@@ -173,6 +219,16 @@ class ModuleManager:
         self,
         name_includes: str | None = None,
     ) -> None:
+        """
+        Rewrite module manifests from in-memory state.
+
+        Args:
+            name_includes (str | None): Restrict to modules whose name contains
+                this substring. Defaults to None.
+
+        Returns:
+            None
+        """
         for module in self.modules.values():
             if name_includes and name_includes not in module.name:
                 continue
@@ -184,6 +240,15 @@ class ModuleManager:
             log.info(f'module "{module.name}" rewritten')
 
     async def create_module(self, module_name: str) -> None:
+        """
+        Scaffold a new module with example actions and files.
+
+        Args:
+            module_name (str): New module name.
+
+        Returns:
+            None
+        """
         # TODO add --bare; README, LICENSE
 
         log.debug(f'creating module "{module_name}"')
@@ -230,6 +295,15 @@ class ModuleManager:
         log.info(f'module "{module_name}" created')
 
     async def install_module(self, source: str) -> str:
+        """
+        Install a module from a source (repo, folder, or short name).
+
+        Args:
+            source (str): Git URL, local path, or repo short name.
+
+        Returns:
+            str: Installed module name.
+        """
         name = await self.clone_module(source)
 
         await self.modules[name].execute_init()
@@ -238,6 +312,16 @@ class ModuleManager:
         return name
 
     async def clone_module(self, source: str, out_dir: str | Path = MODULES_DIR) -> str:
+        """
+        Clone a module from git or local folder.
+
+        Args:
+            source (str): Git URL, local path, or repo short name.
+            out_dir (str | Path): Destination directory. Defaults to `MODULES_DIR`.
+
+        Returns:
+            str: Cloned module name.
+        """
         out_dir = Path(out_dir) if out_dir else MODULES_DIR
 
         if source.startswith(("git@", "http://", "https://")):
@@ -257,6 +341,15 @@ class ModuleManager:
         return name
 
     async def init_module(self, module_name: str) -> None:
+        """
+        Run the module initialization routine.
+
+        Args:
+            module_name (str): Module to initialize.
+
+        Returns:
+            None
+        """
         if module_name not in self.modules:
             raise Exception(f'module "{module_name}" not found')
 
@@ -264,6 +357,15 @@ class ModuleManager:
         await module.execute_init()
 
     async def delete_module(self, module_name: str) -> None:
+        """
+        Delete a module from disk and registry.
+
+        Args:
+            module_name (str): Module to delete.
+
+        Returns:
+            None
+        """
         if module_name not in self.modules:
             raise Exception(f'module "{module_name}" not found')
 
@@ -275,5 +377,11 @@ class ModuleManager:
         log.info(f'module "{module_name}" deleted')
 
     async def list_modules(self) -> None:
+        """
+        Log registered modules.
+
+        Returns:
+            None
+        """
         for module in self.modules:
             log.info(module)

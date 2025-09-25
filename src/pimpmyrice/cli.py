@@ -16,6 +16,16 @@ log = logging.getLogger(__name__)
 def send_to_server(
     args: dict[str, Any], address: str = "http://127.0.0.1:5000"
 ) -> None:
+    """
+    Forward CLI args to a running server and stream back logs.
+
+    Args:
+        args (dict[str, Any]): Parsed docopt arguments.
+        address (str): Server base URL. Defaults to localhost.
+
+    Returns:
+        None
+    """
     import requests
 
     if "IMAGE" in args and args["IMAGE"]:
@@ -50,6 +60,12 @@ def send_to_server(
 
 
 async def cli() -> None:
+    """
+    Parse CLI args and execute locally or proxy to server.
+
+    Returns:
+        None
+    """
     try:
         args = docopt(cli_doc)
     except DocoptExit:

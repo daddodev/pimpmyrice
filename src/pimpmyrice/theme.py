@@ -28,6 +28,12 @@ log = logging.getLogger(__name__)
 
 
 class ThemeManager:
+    """
+    Manage themes, styles, palettes, and module execution.
+
+    Orchestrates theme parsing, generation, persistence, application, and
+    integrations with modules and events.
+    """
     def __init__(self) -> None:
         timer = Timer()
         create_config_dirs()
@@ -53,16 +59,34 @@ class ThemeManager:
         log.debug(f"ThemeManager initialized in {timer.elapsed:.4f} sec")
 
     def get_config(self) -> ThemeConfig:
+        """
+        Load user configuration from disk.
+
+        Returns:
+            ThemeConfig: Current configuration (theme/mode, etc.).
+        """
         config = ThemeConfig(**load_json(CONFIG_FILE))
         if config.theme not in self.themes:
             config.theme = None
         return config
 
     def save_config(self) -> None:
+        """
+        Persist current configuration to disk.
+
+        Returns:
+            None
+        """
         save_json(CONFIG_FILE, vars(self.config))
 
     @staticmethod
     def get_base_style() -> dict[str, Any]:
+        """
+        Load the base style definition.
+
+        Returns:
+            dict[str, Any]: Base style content.
+        """
         try:
             return load_json(BASE_STYLE_FILE)
         except Exception:
@@ -70,6 +94,15 @@ class ThemeManager:
             raise
 
     async def save_base_style(self, base_style: dict[str, Any]) -> None:
+        """
+        Save and apply a new base style.
+
+        Args:
+            base_style (dict[str, Any]): Base style content.
+
+        Returns:
+            None
+        """
         save_json(BASE_STYLE_FILE, base_style)
         self.base_style = base_style
         schemas.generate_theme_json_schema(self)
@@ -77,23 +110,56 @@ class ThemeManager:
 
     @staticmethod
     def get_styles() -> dict[str, Style]:
+        """
+        Discover available styles.
+
+        Returns:
+            dict[str, Style]: Map of style name to style definition.
+        """
         styles: dict[str, Style] = {f.stem: load_json(f) for f in STYLES_DIR.iterdir()}
         return styles
 
     @staticmethod
     def get_palettes() -> dict[str, GlobalPalette]:
+        """
+        Discover available global palettes.
+
+        Returns:
+            dict[str, GlobalPalette]: Map of palette name to palette.
+        """
         return get_palettes()
 
     @staticmethod
     def get_palette_generators() -> dict[str, PaletteGeneratorType]:
+        """
+        Discover available palette generators.
+
+        Returns:
+            dict[str, PaletteGeneratorType]: Name to generator function.
+        """
         return get_palette_generators()
 
     def parse_theme(self, theme_path: Path) -> Theme:
+        """
+        Parse a theme directory.
+
+        Args:
+            theme_path (Path): Path to theme directory.
+
+        Returns:
+            Theme: Parsed theme.
+        """
         theme = parsers.parse_theme(theme_path)
 
         return theme
 
     def get_themes(self) -> dict[str, Theme]:
+        """
+        Load all themes from disk.
+
+        Returns:
+            dict[str, Theme]: Map of theme name to theme.
+        """
         timer = Timer()
 
         themes: dict[str, Theme] = {}
@@ -125,6 +191,18 @@ class ThemeManager:
         tags: set[str] | None = None,
         apply: bool = False,
     ) -> None:
+        """
+        Generate a theme from an image and optionally apply it.
+
+        Args:
+            image (str): File path or URL.
+            name (str | None): Theme name override. Defaults to None.
+            tags (set[str] | None): Tags to set. Defaults to None.
+            apply (bool): Apply after generation. Defaults to False.
+
+        Returns:
+            None
+        """
         if image.startswith(("http://", "https://")):
             file = download_file(image)
             log.info(f'downloaded "{file.name}"')
@@ -155,6 +233,16 @@ class ThemeManager:
         theme_name: str,
         new_name: str,
     ) -> None:
+        """
+        Rename an existing theme.
+
+        Args:
+            theme_name (str): Current theme name.
+            new_name (str): New theme name.
+
+        Returns:
+            None
+        """
         if theme_name not in self.themes:
             raise Exception(f'theme "{theme_name}" not found')
 
@@ -171,6 +259,16 @@ class ThemeManager:
         theme: Theme,
         old_name: str | None = None,
     ) -> str:
+        """
+        Persist a theme to disk, handling renames and asset imports.
+
+        Args:
+            theme (Theme): Theme to save.
+            old_name (str | None): Previous name (for rename). Defaults to None.
+
+        Returns:
+            str: Final theme name saved on disk.
+        """
         # TODO move theme name check
         if not old_name:
             theme.name = tutils.valid_theme_name(name=theme.name, themes=self.themes)
@@ -218,6 +316,18 @@ class ThemeManager:
         include_tags: set[str] | None = None,
         exclude_tags: set[str] | None = None,
     ) -> None:
+        """
+        Rewrite themes on disk, optionally regenerating palettes and filtering.
+
+        Args:
+            regen_colors (bool): Regenerate palettes. Defaults to False.
+            name_includes (str | None): Name substring filter. Defaults to None.
+            include_tags (set[str] | None): Only themes with any of these tags.
+            exclude_tags (set[str] | None): Exclude themes with any of these tags.
+
+        Returns:
+            None
+        """
         for theme in self.themes.values():
             if name_includes and name_includes not in theme.name:
                 continue
@@ -248,6 +358,15 @@ class ThemeManager:
             log.info(f'theme "{theme.name}" rewritten')
 
     async def delete_theme(self, theme_name: str) -> None:
+        """
+        Delete a theme from disk and memory.
+
+        Args:
+            theme_name (str): Theme to delete.
+
+        Returns:
+            None
+        """
         if theme_name not in self.themes:
             raise Exception(f'theme "{theme_name}" not found')
 
@@ -276,6 +395,21 @@ class ThemeManager:
         exclude_modules: list[str] | None = None,
         print_theme_dict: bool = False,
     ) -> None:
+        """
+        Generate the theme dict and run modules to apply the theme.
+
+        Args:
+            theme_name (str | None): Theme name. Defaults to current.
+            mode_name (str | None): Mode name. Defaults to config.
+            palette_name (str | None): Palette name. Defaults to None.
+            styles_names (list[str] | None): Styles to include. Defaults to None.
+            include_modules (list[str] | None): Modules allowlist. Defaults to None.
+            exclude_modules (list[str] | None): Modules denylist. Defaults to None.
+            print_theme_dict (bool): Log generated dict. Defaults to False.
+
+        Returns:
+            None
+        """
         if not theme_name:
             if not self.config.theme:
                 raise Exception("No current theme")
@@ -326,6 +460,23 @@ class ThemeManager:
         exclude_tags: set[str] | None = None,
         print_theme_dict: bool = False,
     ) -> None:
+        """
+        Apply a random theme matching optional filters.
+
+        Args:
+            mode_name (str | None): Mode name. Defaults to None.
+            styles_names (list[str] | None): Styles to include. Defaults to None.
+            palette_name (str | None): Palette name. Defaults to None.
+            name_includes (str | None): Name substring filter. Defaults to None.
+            include_modules (list[str] | None): Modules allowlist. Defaults to None.
+            exclude_modules (list[str] | None): Modules denylist. Defaults to None.
+            include_tags (set[str] | None): Include tags filter. Defaults to None.
+            exclude_tags (set[str] | None): Exclude tags filter. Defaults to None.
+            print_theme_dict (bool): Log generated dict. Defaults to False.
+
+        Returns:
+            None
+        """
         themes_list: list[Theme] = []
 
         for theme in self.themes.values():
@@ -358,6 +509,12 @@ class ThemeManager:
         )
 
     async def toggle_mode(self) -> None:
+        """
+        Toggle between light and dark modes for the current theme.
+
+        Returns:
+            None
+        """
         if not self.config.theme:
             raise Exception("no theme set")
 
@@ -366,12 +523,31 @@ class ThemeManager:
         await self.apply_theme(mode_name=mode_name)
 
     async def set_mode(self, mode_name: str) -> None:
+        """
+        Set the current mode and apply it.
+
+        Args:
+            mode_name (str): Mode name (e.g., "light" or "dark").
+
+        Returns:
+            None
+        """
         if not self.config.theme:
             raise Exception("no theme set")
 
         return await self.apply_theme(mode_name=mode_name)
 
     async def add_tags(self, themes_names: list[str], tags: set[str]) -> None:
+        """
+        Add tags to themes.
+
+        Args:
+            themes_names (list[str]): Theme names.
+            tags (set[str]): Tags to add.
+
+        Returns:
+            None
+        """
         for theme_name in themes_names:
             if theme_name not in self.themes:
                 log.error('theme "{theme_name}" not found')
@@ -385,6 +561,16 @@ class ThemeManager:
                 log.info(f'tag "{tag}" added to theme "{theme.name}"')
 
     async def remove_tags(self, themes_names: list[str], tags: set[str]) -> None:
+        """
+        Remove tags from themes.
+
+        Args:
+            themes_names (list[str]): Theme names (empty => all).
+            tags (set[str]): Tags to remove.
+
+        Returns:
+            None
+        """
         if len(themes_names) == 0:
             themes_names = list(self.themes.keys())
 
@@ -402,18 +588,42 @@ class ThemeManager:
                     log.info(f'tag "{tag}" removed from theme "{theme.name}"')
 
     async def list_themes(self) -> None:
+        """
+        Log all themes and their tags.
+
+        Returns:
+            None
+        """
         log.info("\nNAME\t\t\tTAGS\n")
         for theme in self.themes.values():
             log.info(f"{theme.name:10}\t\t{', '.join(theme.tags)}")
 
     async def list_tags(self) -> None:
+        """
+        Log all known tags.
+
+        Returns:
+            None
+        """
         log.info("\n".join(self.tags))
 
     async def list_palettes(self) -> None:
+        """
+        Log all known palettes.
+
+        Returns:
+            None
+        """
         for palette in self.palettes:
             log.info(f"{palette}")
 
     async def list_styles(self) -> None:
+        """
+        Log all known styles.
+
+        Returns:
+            None
+        """
         for style in self.styles:
             log.info(f"{style}")
 
@@ -428,6 +638,22 @@ class ThemeManager:
         exclude_modules: list[str] | None = None,
         print_theme_dict: bool = False,
     ) -> None:
+        """
+        Export a theme by running modules and copying assets to a directory.
+
+        Args:
+            theme_name (str): Theme name.
+            out_dir (Path): Output directory.
+            mode_name (str | None): Mode name. Defaults to config.
+            palette_name (str | None): Palette name. Defaults to None.
+            styles_names (list[str] | None): Styles to include. Defaults to None.
+            include_modules (list[str] | None): Modules allowlist. Defaults to None.
+            exclude_modules (list[str] | None): Modules denylist. Defaults to None.
+            print_theme_dict (bool): Log generated dict. Defaults to False.
+
+        Returns:
+            None
+        """
         if theme_name not in self.themes:
             raise Exception(f'theme "{theme_name}" not found')
 
@@ -490,6 +716,15 @@ Dump generated with [pimp](https://github.com/daddodev/pimpmyrice) `theme export
         log.info(f'theme "{theme_name}" exported to {dump_dir}')
 
     async def install_module(self, source: str) -> None:
+        """
+        Install a module and apply the current theme to it.
+
+        Args:
+            source (str): Module source (name, repo, or path).
+
+        Returns:
+            None
+        """
         module_name = await self.mm.install_module(source)
 
         if theme_name := self.config.theme:

@@ -9,6 +9,16 @@ log = logging.getLogger(__name__)
 
 
 async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
+    """
+    Dispatch CLI arguments to theme and module operations.
+
+    Args:
+        tm (ThemeManager): Theme manager instance.
+        args (dict[str, Any]): Parsed docopt arguments.
+
+    Returns:
+        None
+    """
     options = {
         "mode_name": args["--mode"],
         "palette_name": args["--palette"],

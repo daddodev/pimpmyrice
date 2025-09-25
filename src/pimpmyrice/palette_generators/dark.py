@@ -5,6 +5,15 @@ from pimpmyrice.colors import Color, Palette
 
 
 async def gen_palette(image_path: Path) -> Palette:
+    """
+    Generate a dark-oriented palette from an image.
+
+    Args:
+        image_path (Path): Path to the source image.
+
+    Returns:
+        Palette: Palette emphasizing darker backgrounds and vibrant accents.
+    """
     colors_with_count = extract_colors(image_path)
     # TODO use count
 

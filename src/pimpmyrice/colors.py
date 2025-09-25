@@ -16,9 +16,24 @@ log = logging.getLogger(__name__)
 
 
 class Color:
+    """
+    Color with normalized RGBA components.
+
+    Construct from hex/rgb(a)/hsl(a)/hsv(a) strings, 3- or 4-int tuples (0–255),
+    or another Color. `_rgba` is internal; use public APIs.
+    """
     _rgba: tuple[float, float, float, float]
 
     def __init__(self, value: str | tuple[int, ...] | "Color") -> None:
+        """
+        Initialize from a color string, RGB(A) 0–255 tuple, or `Color`.
+
+        Args:
+            value (str | tuple[int, ...] | Color): Input color value.
+
+        Returns:
+            None
+        """
         if isinstance(value, tuple):
             self._rgba = self._parse_rgb_tuple(value)
         elif isinstance(value, str):
@@ -32,6 +47,15 @@ class Color:
 
     @staticmethod
     def _parse_rgb_tuple(value: tuple[int, ...]) -> tuple[float, float, float, float]:
+        """
+        Convert (r, g, b[, a]) 0–255 ints to normalized floats.
+
+        Args:
+            value (tuple[int, ...]): (r, g, b) or (r, g, b, a) with 0–255 ints.
+
+        Returns:
+            tuple[float, float, float, float]: (r, g, b, a) in [0.0, 1.0].
+        """
         r = value[0] / 255
         g = value[1] / 255
         b = value[2] / 255
@@ -41,6 +65,15 @@ class Color:
 
     @staticmethod
     def _parse_str(value: str) -> tuple[float, float, float, float]:
+        """
+        Dispatch parser for hex/rgb(a)/hsl(a)/hsv(a) strings.
+
+        Args:
+            value (str): Color string.
+
+        Returns:
+            tuple[float, float, float, float]: Normalized RGBA.
+        """
         if value.startswith("#"):
             return Color._parse_hex(value)
         elif value.startswith("rgb"):
@@ -53,6 +86,15 @@ class Color:
 
     @staticmethod
     def _parse_rgb(value: str) -> tuple[float, float, float, float]:
+        """
+        Parse an "rgb(...)" or "rgba(...)" string.
+
+        Args:
+            value (str): RGB(A) string.
+
+        Returns:
+            tuple[float, float, float, float]: Normalized RGBA.
+        """
         value_string = value.split("(")[1][:-1]
         values = value_string.split(",")
 
@@ -65,6 +107,15 @@ class Color:
 
     @staticmethod
     def _parse_hex(value: str) -> tuple[float, float, float, float]:
+        """
+        Parse "#RRGGBB" or "#RRGGBBAA".
+
+        Args:
+            value (str): Hex string.
+
+        Returns:
+            tuple[float, float, float, float]: Normalized RGBA.
+        """
         value = value[1:]
         parsed = tuple(int(value[i : i + 2], 16) / 255 for i in range(0, len(value), 2))
 
@@ -77,6 +128,15 @@ class Color:
 
     @staticmethod
     def _parse_hsl(value: str) -> tuple[float, float, float, float]:
+        """
+        Parse "hsl(...)"/"hsla(...)".
+
+        Args:
+            value (str): HSL(A) string.
+
+        Returns:
+            tuple[float, float, float, float]: Normalized RGBA.
+        """
         value_string = value.split("(")[1][:-1]
         values = [x.strip("% ") for x in value_string.split(",")]
 
@@ -91,6 +151,15 @@ class Color:
 
     @staticmethod
     def _parse_hsv(value: str) -> tuple[float, float, float, float]:
+        """
+        Parse "hsv(...)"/"hsva(...)".
+
+        Args:
+            value (str): HSV(A) string.
+
+        Returns:
+            tuple[float, float, float, float]: Normalized RGBA.
+        """
         value_string = value.split("(")[1][:-1]
         values = [x.strip("% ") for x in value_string.split(",")]
 
@@ -105,25 +174,64 @@ class Color:
 
     @property
     def alpha(self) -> float:
+        """
+        Alpha channel.
+
+        Returns:
+            float: Value in [0.0, 1.0].
+        """
         return self._rgba[3]
 
     @property
     def hex(self) -> str:
+        """
+        Hex string without alpha.
+
+        Returns:
+            str: "#RRGGBB".
+        """
         return f"#{''.join(self.hex_tuple())}"
 
     @property
     def hexa(self) -> str:
+        """
+        Hex string with alpha.
+
+        Returns:
+            str: "#RRGGBBAA".
+        """
         return f"#{''.join(self.hex_tuple(alpha=True))}"
 
     @property
     def nohash(self) -> str:
+        """
+        Hex without leading '#'.
+
+        Returns:
+            str: "RRGGBB".
+        """
         return self.hex[1:]
 
     @property
     def nohasha(self) -> str:
+        """
+        Hex without '#', with alpha.
+
+        Returns:
+            str: "RRGGBBAA".
+        """
         return self.hexa[1:]
 
     def hex_tuple(self, alpha: bool = False) -> tuple[str, ...]:
+        """
+        Two-digit lowercase hex components.
+
+        Args:
+            alpha (bool): Include alpha. Defaults to False.
+
+        Returns:
+            tuple[str, ...]: ("rr", "gg", "bb"[, "aa"]).
+        """
         return tuple(
             f"{hex(int(x * 255))[2:]:0>2}"
             for x in (self._rgba if alpha else self._rgba[:3])
@@ -131,44 +239,117 @@ class Color:
 
     @property
     def rgb(self) -> str:
+        """
+        RGB string with 0–255 components.
+
+        Returns:
+            str: "rgb(r, g, b)".
+        """
         return f"rgb({', '.join([str(int(v * 255)) for v in self._rgba[:3]])})"
 
     @property
     def rgba(self) -> str:
+        """
+        RGBA string with 0–255 components.
+
+        Returns:
+            str: "rgba(r, g, b, a)".
+        """
         return f"rgba({', '.join([str(int(v * 255)) for v in self._rgba])})"
 
     def rgb_tuple(self, alpha: bool = False) -> tuple[float, ...]:
+        """
+        Normalized RGB(A) tuple.
+
+        Args:
+            alpha (bool): Include alpha. Defaults to False.
+
+        Returns:
+            tuple[float, ...]: (r, g, b[, a]) in [0.0, 1.0].
+        """
         return self._rgba if alpha else self._rgba[:3]
 
     @property
     def hsl(self) -> str:
+        """
+        HSL string.
+
+        Returns:
+            str: "hsl(h, s%, l%)".
+        """
         h, s, l = self.hsl_tuple()
         return f"hsl({int(h * 360)}, {int(s * 100)}%, {int(l * 100)}%)"
 
     @property
     def hsla(self) -> str:
+        """
+        HSLA string (alpha rounded to 2 decimals).
+
+        Returns:
+            str: "hsla(h, s%, l%, a)".
+        """
         h, s, l, a = self.hsl_tuple(alpha=True)
         return f"hsla({int(h * 360)}, {int(s * 100)}%, {int(l * 100)}%, {round(a, 2)})"
 
     def hsl_tuple(self, alpha: bool = False) -> tuple[float, ...]:
+        """
+        Normalized HSL(A) tuple.
+
+        Args:
+            alpha (bool): Include alpha. Defaults to False.
+
+        Returns:
+            tuple[float, ...]: (h, s, l[, a]) in [0.0, 1.0].
+        """
         h, l, s = colorsys.rgb_to_hls(*self._rgba[:3])
         return (h, s, l, self._rgba[3]) if alpha else (h, s, l)
 
     @property
     def hsv(self) -> str:
+        """
+        HSV string.
+
+        Returns:
+            str: "hsv(h, s%, v%)".
+        """
         h, s, v = self.hsv_tuple()
         return f"hsv({int(h * 360)}, {int(s * 100)}%, {int(v * 100)}%)"
 
     @property
     def hsva(self) -> str:
+        """
+        HSVA string (alpha rounded to 2 decimals).
+
+        Returns:
+            str: "hsva(h, s%, v%, a)".
+        """
         h, s, v, a = self.hsv_tuple(alpha=True)
         return f"hsva({int(h * 360)}, {int(s * 100)}%, {int(v * 100)}%, {round(a, 2)})"
 
     def hsv_tuple(self, alpha: bool = False) -> tuple[float, ...]:
+        """
+        Normalized HSV(A) tuple.
+
+        Args:
+            alpha (bool): Include alpha. Defaults to False.
+
+        Returns:
+            tuple[float, ...]: (h, s, v[, a]) in [0.0, 1.0].
+        """
         h, s, v = colorsys.rgb_to_hsv(*self._rgba[:3])
         return (h, s, v, self._rgba[3]) if alpha else (h, s, v)
 
     def contrasting(self, base: Color | None = None, val_delta: int = 75) -> Color:
+        """
+        Improve contrast by adjusting V; relative to `base` if provided.
+
+        Args:
+            base (Color | None): Reference color. Defaults to None.
+            val_delta (int): Value (V) delta percent. Defaults to 75.
+
+        Returns:
+            Color: Contrasting color.
+        """
         h, s, v, a = self.hsv_tuple(alpha=True)
         delta = val_delta / 100
 
@@ -204,7 +385,24 @@ class Color:
         max_alpha: int | None = None,
     ) -> "Color":
         """
-        using HSV
+        Return a new color with HSV(A) channels adjusted.
+
+        Args:
+            hue (int | str | None): Absolute or "+N"/"-N". Range [0, 360).
+            min_hue (int | None): Minimum hue after adjustment.
+            max_hue (int | None): Maximum hue after adjustment.
+            sat (int | str | None): Absolute or "+N"/"-N". Range [0, 100].
+            min_sat (int | None): Minimum saturation.
+            max_sat (int | None): Maximum saturation.
+            val (int | str | None): Absolute or "+N"/"-N". Range [0, 100].
+            min_val (int | None): Minimum value.
+            max_val (int | None): Maximum value.
+            alpha (int | str | None): Absolute or "+N"/"-N". Range [0, 100].
+            min_alpha (int | None): Minimum alpha.
+            max_alpha (int | None): Maximum alpha.
+
+        Returns:
+            Color: Adjusted color.
         """
 
         def _adjust(

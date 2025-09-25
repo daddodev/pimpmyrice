@@ -19,6 +19,16 @@ log = logging.getLogger(__name__)
 
 
 def create_dynamic_model(name: str, source: dict[str, Any]) -> BaseModel:
+    """
+    Create a Pydantic model from a nested dict of example values.
+
+    Args:
+        name (str): Base model name.
+        source (dict[str, Any]): Example data used to define fields.
+
+    Returns:
+        BaseModel: Generated model class instance.
+    """
     fields: dict[str, Any] = {}
     for key, value in source.items():
         if isinstance(value, dict):
@@ -33,6 +43,12 @@ def create_dynamic_model(name: str, source: dict[str, Any]) -> BaseModel:
 
 
 def get_fonts() -> tuple[list[str], list[str]]:
+    """
+    Enumerate installed font families and monospaced families.
+
+    Returns:
+        tuple[list[str], list[str]]: (all families, monospace families).
+    """
     all_families: set[str] = set()
     mono_families: set[str] = set()
 
@@ -97,6 +113,15 @@ def get_fonts() -> tuple[list[str], list[str]]:
 
 
 def generate_theme_json_schema(tm: ThemeManager) -> None:
+    """
+    Generate and save the JSON Schema for Theme files.
+
+    Args:
+        tm (ThemeManager): Theme manager to gather tags and module styles.
+
+    Returns:
+        None
+    """
     base_style = deepcopy(tm.base_style)
 
     for module in tm.mm.modules:
@@ -181,6 +206,12 @@ def generate_theme_json_schema(tm: ThemeManager) -> None:
 
 
 def generate_module_json_schema() -> None:
+    """
+    Generate and save the JSON Schema for Module files.
+
+    Returns:
+        None
+    """
     module_schema = Module.model_json_schema()
 
     schema_path = JSON_SCHEMA_DIR / "module.json"

@@ -17,6 +17,15 @@ log = logging.getLogger(__name__)
 
 
 async def process_edit_args(args: dict[str, Any]) -> None:
+    """
+    Open configured resources (theme/style/palette/module) in $EDITOR.
+
+    Args:
+        args (dict[str, Any]): Parsed docopt arguments.
+
+    Returns:
+        None
+    """
     def open_editor(dir: Path) -> None:
         os.system(f'$EDITOR "{dir}"')
 
