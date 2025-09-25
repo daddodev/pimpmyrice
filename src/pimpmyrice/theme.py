@@ -207,6 +207,7 @@ class ThemeManager:
 
             if self.config.theme == old_name:
                 self.config.theme = theme.name
+                self.save_config()
 
         return theme.name
 
