@@ -4,6 +4,7 @@ from typing import Any, Callable, Coroutine
 
 class EventHandler:
     """Simple async event pub/sub handler."""
+
     def __init__(self) -> None:
         self.subscribers: dict[str, list[Callable[[], Coroutine[Any, Any, None]]]] = {}
 

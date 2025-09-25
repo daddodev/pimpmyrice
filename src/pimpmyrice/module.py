@@ -34,6 +34,7 @@ class ModuleManager:
     Loads modules from disk, runs their pre-run/run actions, and provides
     helpers for install, clone, init, rewrite, and deletion.
     """
+
     def __init__(self) -> None:
         self.modules: dict[str, Module] = {}
         self.load_modules()

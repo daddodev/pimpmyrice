@@ -34,6 +34,7 @@ log = logging.getLogger(__name__)
 
 class ModuleState(Enum):
     """Execution state for a module action pipeline."""
+
     PENDING = auto()
     RUNNING = auto()
     COMPLETED = auto()
@@ -55,6 +56,7 @@ def module_context_wrapper(
     Returns:
         Coroutine[Any, Any, Any]: Wrapped coroutine that manages state.
     """
+
     async def wrapped() -> Any:
         timer = Timer()
         token = current_module.set(module_name)
@@ -101,6 +103,7 @@ def add_action_type_to_schema(
 
 class ShellAction(BaseModel):
     """Execute a shell command, optionally detached."""
+
     action: Literal["shell"] = Field(default="shell")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     command: str
@@ -148,6 +151,7 @@ class ShellAction(BaseModel):
 
 class FileAction(BaseModel):
     """Render a template file and write it to a target path."""
+
     action: Literal["file"] = Field(default="file")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     target: str
@@ -221,6 +225,7 @@ class FileAction(BaseModel):
 
 class PythonAction(BaseModel):
     """Invoke an async Python function from a module file."""
+
     action: Literal["python"] = Field(default="python")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     py_file_path: str
@@ -259,6 +264,7 @@ class PythonAction(BaseModel):
 
 class WaitForAction(BaseModel):
     """Pause until another module reaches a terminal state or timeout expires."""
+
     action: Literal["wait_for"] = Field(default="wait_for")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     module: str
@@ -297,6 +303,7 @@ class WaitForAction(BaseModel):
 
 class IfRunningAction(BaseModel):
     """Conditionally gate execution based on a process running/not running."""
+
     action: Literal["if_running"] = Field(default="if_running")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     program_name: str
@@ -327,6 +334,7 @@ class IfRunningAction(BaseModel):
 
 class LinkAction(BaseModel):
     """Create a symbolic link from module-managed origin to destination."""
+
     action: Literal["link"] = Field(default="link")
     module_name: SkipJsonSchema[str] = Field(exclude=True)
     origin: str
@@ -373,6 +381,7 @@ ModuleCommand = Union[PythonAction]
 
 class Module(BaseModel):
     """Module definition and execution helpers for actions and commands."""
+
     name: SkipJsonSchema[str] = Field(exclude=True)
     enabled: bool = True
     os: list[Os] = list(Os)
@@ -558,6 +567,7 @@ def run_shell_command_detached(command: str, cwd: Path | None = None) -> None:
 @dataclass
 class ShellResponse:
     """Captured result of a shell command execution."""
+
     out: str
     err: str
     returncode: int

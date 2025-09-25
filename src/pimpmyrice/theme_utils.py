@@ -61,12 +61,14 @@ def get_palette_generators() -> dict[str, PaletteGeneratorType]:
 
 class ThemeConfig(BaseModel):
     """User configuration for theme selection and mode."""
+
     theme: str | None = None
     mode: str = "dark"
 
 
 class Mode(BaseModel):
     """Theme mode configuration (palette, wallpaper, and style)."""
+
     name: SkipJsonSchema[str] = Field(exclude=True)
     palette: LinkPalette | Palette
     wallpaper: Wallpaper | None = None
@@ -75,6 +77,7 @@ class Mode(BaseModel):
 
 class WallpaperMode(str, Enum):
     """Wallpaper fit behavior for the display."""
+
     FILL = "fill"
     FIT = "fit"
 
@@ -85,6 +88,7 @@ class WallpaperMode(str, Enum):
 
 class Wallpaper(BaseModel):
     """Wallpaper resource and display mode."""
+
     path: Path
     mode: WallpaperMode = WallpaperMode.FILL
 
@@ -103,6 +107,7 @@ class Wallpaper(BaseModel):
 
 class Theme(BaseModel):
     """Theme definition: composition of modes, style and metadata."""
+
     path: Path = Field()
     name: str = Field()
     wallpaper: Wallpaper

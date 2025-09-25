@@ -15,6 +15,7 @@ log = logging.getLogger(__name__)
 
 class Timer:
     """Monotonic wall-clock timer utility."""
+
     def __init__(self) -> None:
         self.start = time.perf_counter()
 
@@ -31,6 +32,7 @@ class AttrDict(dict[str, Any]):
     Allows deep-merging with `+` operator.
     Values in `other` take precedence over values in `self`.
     """
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.__dict__ = self
         super().__init__(*args, **kwargs)
@@ -55,6 +57,7 @@ class AttrDict(dict[str, Any]):
         Returns:
             AttrDict: Merged copy.
         """
+
         def merged(base: AttrDict, to_add: AttrDict) -> AttrDict:
             base = deepcopy(base)
             to_add = deepcopy(to_add)
@@ -123,6 +126,7 @@ def is_locked(lockfile: Path) -> tuple[bool, int]:
 
 class Lock:
     """Simple PID file lock context manager."""
+
     def __init__(self, lockfile: Path) -> None:
         self.lockfile = lockfile
 

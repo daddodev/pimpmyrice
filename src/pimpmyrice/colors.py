@@ -22,6 +22,7 @@ class Color:
     Construct from hex/rgb(a)/hsl(a)/hsv(a) strings, 3- or 4-int tuples (0–255),
     or another Color. `_rgba` is internal; use public APIs.
     """
+
     _rgba: tuple[float, float, float, float]
 
     def __init__(self, value: str | tuple[int, ...] | "Color") -> None:

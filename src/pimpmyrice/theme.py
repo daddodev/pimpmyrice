@@ -34,6 +34,7 @@ class ThemeManager:
     Orchestrates theme parsing, generation, persistence, application, and
     integrations with modules and events.
     """
+
     def __init__(self) -> None:
         timer = Timer()
         create_config_dirs()

@@ -26,6 +26,7 @@ async def process_edit_args(args: dict[str, Any]) -> None:
     Returns:
         None
     """
+
     def open_editor(dir: Path) -> None:
         os.system(f'$EDITOR "{dir}"')
 

@@ -10,6 +10,7 @@ current_module: ContextVar[str] = ContextVar("current_module", default="")
 
 class ContextFilter(logging.Filter):
     """Inject request and module context into log records."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = request_id.get()
         if not hasattr(record, "module_name"):
@@ -19,6 +20,7 @@ class ContextFilter(logging.Filter):
 
 class ModuleFormatter(logging.Formatter):
     """Formatter that prefixes messages with module name when available."""
+
     def format(self, record: logging.LogRecord) -> str:
         base_format = "%(message)s"
         if hasattr(record, "module_name") and record.module_name:
