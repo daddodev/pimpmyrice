@@ -350,6 +350,7 @@ jobs:
 
   build_linux_binary:
     name: build linux binary
+    needs: [details]
     runs-on: ubuntu-latest
 
     steps:
@@ -370,6 +371,7 @@ jobs:
       - name: Build executable with PyInstaller
         run: |
           pyinstaller packaging/pyinstaller.spec
+          mv dist/pimp dist/pimpmyrice-${{ needs.details.outputs.new_version }}-portable-linux
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
@@ -380,6 +382,7 @@ jobs:
 
   build_windows_binary:
     name: build windows binary
+    needs: [details]
     runs-on: windows-latest
 
     steps:
@@ -400,11 +403,43 @@ jobs:
       - name: Build executable with PyInstaller
         run: |
           pyinstaller packaging/pyinstaller.spec
+          mv dist/pimp.exe dist/pimpmyrice-${{ needs.details.outputs.new_version }}-portable-windows.exe
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: windows_binary
+          path: dist/
+
+
+  build_macos_binary:
+    name: build macOS binary
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller packaging/pyinstaller.spec
+          mv dist/pimp dist/pimpmyrice-${{ needs.details.outputs.new_version }}-portable-macos
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos_binary
           path: dist/
 
 
@@ -433,6 +468,44 @@ jobs:
           path: dist/*Setup*.exe
 
 
+  build_macos_dmg:
+    runs-on: macos-latest
+    needs: [details, build_macos_binary]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download macOS binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos_binary
+          path: dist
+      
+      - name: Install create-dmg
+        run: |
+          brew install create-dmg
+
+      - name: Create .dmg
+        run: |
+          mkdir -p dmg_temp/Applications
+          cp dist/pimpmyrice-* dmg_temp/Applications/
+          create-dmg \
+            --volname "pimpmyrice" \
+            --window-pos 200 120 \
+            --window-size 600 300 \
+            --icon-size 100 \
+            --icon "Applications" 175 120 \
+            --hide-extension "pimpmyrice-${{ needs.details.outputs.new_version }}-portable-macos" \
+            --app-drop-link 425 120 \
+            "pimpmyrice-${{ needs.details.outputs.new_version }}.dmg" \
+            "dmg_temp/"
+
+      - name: Upload .dmg artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos_dmg
+          path: "*.dmg"
+
+
   github_release:
     name: Create GitHub Release
     needs: [
@@ -442,6 +515,8 @@ jobs:
       build_linux_binary,
       build_windows_binary,
       build_windows_installer,
+      build_macos_binary,
+      build_macos_dmg,
     ]
     runs-on: ubuntu-latest
     permissions:
@@ -488,6 +563,18 @@ jobs:
           name: windows_installer
           path: windows_installer/
 
+      - name: Download macOS binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos_binary
+          path: macos_binary/
+
+      - name: Download macOS .dmg artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos_dmg
+          path: macos_dmg/
+
       - name: Create release dir
         run: |
           mkdir release
@@ -497,6 +584,8 @@ jobs:
           cp linux_binary/* release/
           cp windows_binary/* release/
           cp windows_installer/* release/
+          cp macos_binary/* release/
+          cp macos_dmg/* release/
 
       - name: Create GitHub Release
         id: create_release
