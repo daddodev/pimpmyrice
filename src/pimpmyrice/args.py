@@ -20,7 +20,7 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
         None
     """
     options = {
-        "mode_name": args["--mode"],
+        "mode_name": args["MODE"] or args["--mode"],
         "palette_name": args["--palette"],
         "print_theme_dict": args["--print-theme-dict"],
     }

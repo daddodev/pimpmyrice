@@ -14,10 +14,10 @@ Usage:
                             [--exclude-modules=MODULES] [--style=STYLE]
                                [--palette=PALETTE] [--print-theme-dict]
                                                               [options]
-    pimp theme set THEME              [--mode=MODE] [--modules=MODULES]
+    pimp theme set THEME [MODE]                     [--modules=MODULES]
                             [--exclude-modules=MODULES] [--style=STYLE]
                                [--palette=PALETTE] [--print-theme-dict]
-                                                              [options]
+                                                               [options]
     pimp theme rename THEME NEW_NAME                          [options]
     pimp theme delete THEME                                   [options]
     pimp theme list                                           [options]
@@ -55,4 +55,15 @@ Usage:
 
 Options:
     --verbose, -v
+    --mode=MODE
+    --palette=PALETTE
+    --print-theme-dict
+    --tags=TAGS
+    --exclude-tags=TAGS
+    --style=STYLE
+    --modules=MODULES
+    --exclude-modules=MODULES
+    --name=NAME
+    --apply
+    --out=OUT_DIR
 """
