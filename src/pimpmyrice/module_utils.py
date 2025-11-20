@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import inspect
 import logging
 import os
 import shlex
@@ -237,7 +238,7 @@ class PythonAction(BaseModel):
 
     async def run(self, *args: Any, **kwargs: Any) -> Any:
         """
-        Load and invoke the configured async function.
+        Load and invoke the configured function (sync or async).
 
         Args:
             *args (Any): Positional arguments for the function.
@@ -255,7 +256,14 @@ class PythonAction(BaseModel):
 
         log.debug(f"{file_path}: {self.function_name} loaded")
 
-        res = await fn(*args, **kwargs)
+        if inspect.iscoroutinefunction(fn):
+            res = await fn(*args, **kwargs)
+        else:
+            # Wrap sync function to make it async
+            def sync_wrapper():
+                return fn(*args, **kwargs)
+
+            res = await asyncio.to_thread(sync_wrapper)
 
         log.debug(f"{file_path.name}: {self.function_name} returned:\n{res}")
 
