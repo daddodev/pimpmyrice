@@ -44,6 +44,8 @@ Usage:
     pimp module run MODULE COMMAND [COMMAND_ARGS...]          [options]
     pimp module create MODULE_NAME                            [options]
     pimp module delete MODULES...                             [options]
+    pimp module enable MODULES...                             [options]
+    pimp module disable MODULES...                            [options]
     pimp module list                                          [options]
     pimp module edit MODULE                                   [options]
     pimp module rewrite [MODULES...]                          [options]

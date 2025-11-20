@@ -119,6 +119,16 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
                 await tm.mm.delete_module(module_name)
             return
 
+        elif args["enable"]:
+            for module_name in args["MODULES"]:
+                await tm.mm.set_enabled(module_name, True)
+            return
+
+        elif args["disable"]:
+            for module_name in args["MODULES"]:
+                await tm.mm.set_enabled(module_name, False)
+            return
+
         elif args["run"]:
             await tm.mm.run_module_command(
                 tm,

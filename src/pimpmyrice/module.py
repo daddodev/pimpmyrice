@@ -377,12 +377,39 @@ class ModuleManager:
 
         log.info(f'module "{module_name}" deleted')
 
-    async def list_modules(self) -> None:
+    async def set_enabled(self, module_name: str, enabled: bool) -> None:
         """
-        Log registered modules.
+        Set a module's enabled status and persist the change.
+
+        Args:
+            module_name (str): Module to modify.
+            enabled (bool): New enabled status.
 
         Returns:
             None
         """
-        for module in self.modules:
-            log.info(module)
+        if module_name not in self.modules:
+            raise Exception(f'module "{module_name}" not found')
+
+        module = self.modules[module_name]
+        if module.enabled == enabled:
+            status = "enabled" if enabled else "disabled"
+            log.info(f'module "{module_name}" is already {status}')
+            return
+
+        module.enabled = enabled
+        dump = module.model_dump(mode="json")
+        save_yaml(MODULES_DIR / module.name / "module.yaml", dump)
+        status = "enabled" if enabled else "disabled"
+        log.info(f'module "{module_name}" {status}')
+
+    async def list_modules(self) -> None:
+        """
+        Log registered modules with enabled/disabled status.
+
+        Returns:
+            None
+        """
+        for module_name, module in self.modules.items():
+            status = "enabled" if module.enabled else "disabled"
+            log.info(f"{module_name} ({status})")
