@@ -9,6 +9,7 @@ import rich
 from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import GlobalPalette, get_palettes
+from pimpmyrice.theme_utils import parse_colors_in_style
 from pimpmyrice.completions import generate_shell_suggestions
 from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.events import EventHandler
@@ -89,7 +90,8 @@ class ThemeManager:
             dict[str, Any]: Base style content.
         """
         try:
-            return load_json(BASE_STYLE_FILE)
+            base_style = load_json(BASE_STYLE_FILE)
+            return parse_colors_in_style(base_style)
         except Exception:
             log.error("failed loading base_style.json")
             raise
@@ -117,7 +119,14 @@ class ThemeManager:
         Returns:
             dict[str, Style]: Map of style name to style definition.
         """
-        styles: dict[str, Style] = {f.stem: load_json(f) for f in STYLES_DIR.iterdir()}
+        styles: dict[str, Style] = {}
+        for f in STYLES_DIR.iterdir():
+            try:
+                style_data = load_json(f)
+                styles[f.stem] = parse_colors_in_style(style_data)
+            except Exception as e:
+                log.error(f'Failed to load style "{f.stem}": {e}')
+                continue
         return styles
 
     @staticmethod

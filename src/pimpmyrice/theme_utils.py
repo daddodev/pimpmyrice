@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, computed_field, validator
 from pydantic.json_schema import SkipJsonSchema
 
 from pimpmyrice import files
-from pimpmyrice.colors import LinkPalette, Palette
+from pimpmyrice.colors import Color, LinkPalette, Palette
 from pimpmyrice.config_paths import PALETTE_GENERATORS_DIR
 from pimpmyrice.exceptions import ReferenceNotFound
 from pimpmyrice.module_utils import get_func_from_py_file
@@ -26,6 +26,50 @@ if TYPE_CHECKING:
     from pimpmyrice.theme import ThemeManager
 
 log = logging.getLogger(__name__)
+
+
+def parse_colors_in_style(style: dict[str, Any]) -> dict[str, Any]:
+    """
+    Recursively parse color strings to Color objects in a style dictionary.
+
+    Args:
+        style (dict[str, Any]): Style dictionary with potential color strings.
+
+    Returns:
+        dict[str, Any]: Style dictionary with color strings parsed to Color objects.
+    """
+
+    def is_color_string(value: str) -> bool:
+        """Check if a string looks like a color."""
+        if not isinstance(value, str):
+            return False
+
+        value = value.strip()
+        if value.startswith("{{") and value.endswith("}}"):
+            return False
+        return (
+            value.startswith("#")
+            or value.startswith("rgb")
+            or value.startswith("hsl")
+            or value.startswith("hsv")
+        )
+
+    def parse_value(value: Any) -> Any:
+        """Parse a single value, converting color strings to Color objects."""
+        if isinstance(value, dict):
+            return {k: parse_value(v) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [parse_value(item) for item in value]
+        elif is_color_string(value):
+            try:
+                return Color(value)
+            except Exception as e:
+                log.warning(f'Failed to parse color "{value}": {e}')
+                return value
+        else:
+            return value
+
+    return parse_value(style)
 
 
 Style = dict[str, Any]
