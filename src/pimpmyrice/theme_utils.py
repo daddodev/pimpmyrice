@@ -69,7 +69,9 @@ def parse_colors_in_style(style: dict[str, Any]) -> dict[str, Any]:
         else:
             return value
 
-    return parse_value(style)
+    parsed: dict[str, Any] = parse_value(style)
+
+    return parsed
 
 
 Style = dict[str, Any]

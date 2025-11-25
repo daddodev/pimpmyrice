@@ -260,7 +260,7 @@ class PythonAction(BaseModel):
             res = await fn(*args, **kwargs)
         else:
             # Wrap sync function to make it async
-            def sync_wrapper():
+            def sync_wrapper() -> Any:
                 return fn(*args, **kwargs)
 
             res = await asyncio.to_thread(sync_wrapper)

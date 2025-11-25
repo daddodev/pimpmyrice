@@ -9,7 +9,6 @@ import rich
 from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import GlobalPalette, get_palettes
-from pimpmyrice.theme_utils import parse_colors_in_style
 from pimpmyrice.completions import generate_shell_suggestions
 from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.events import EventHandler
@@ -22,6 +21,7 @@ from pimpmyrice.theme_utils import (
     Theme,
     ThemeConfig,
     get_palette_generators,
+    parse_colors_in_style,
 )
 from pimpmyrice.utils import Timer
 
