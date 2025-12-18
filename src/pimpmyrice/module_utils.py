@@ -381,7 +381,53 @@ class LinkAction(BaseModel):
         log.info(f'init: "{destination_path}" linked to "{origin_path}"')
 
 
-ModuleInit = Union[LinkAction]
+class AppendAction(BaseModel):
+    """Append a string content to a destination file."""
+
+    action: Literal["append"] = Field(default="append")
+    module_name: SkipJsonSchema[str] = Field(exclude=True)
+    target: str
+    content: str
+
+    model_config = ConfigDict(
+        json_schema_extra=partial(add_action_type_to_schema, "append")
+    )
+
+    async def run(self) -> None:
+        """
+        Append the content to the destination file, ensuring it isn't already present.
+
+        Returns:
+            None
+        """
+
+        destination_path = Path(
+            parse_string_vars(self.target, module_name=self.module_name)
+        )
+
+        if not destination_path.exists():
+            raise Exception(
+                f'cannot append to destination "{destination_path}", file does not exist'
+            )
+
+        parsed_content = parse_string_vars(
+            self.content,
+            module_name=self.module_name,
+        )
+
+        with open(destination_path, "r+", encoding="utf-8") as f:
+            existing_content = f.read()
+            if parsed_content in existing_content:
+                log.info(
+                    f'init: skipping appending content to "{destination_path}", content already present'
+                )
+                return
+            f.write(f"\n{parsed_content}")
+
+        log.info(f'init: appended content to "{destination_path}"')
+
+
+ModuleInit = Union[LinkAction, AppendAction]
 ModulePreRun = Union[PythonAction]
 ModuleRun = Union[ShellAction, FileAction, PythonAction, IfRunningAction, WaitForAction]
 ModuleCommand = Union[PythonAction]
