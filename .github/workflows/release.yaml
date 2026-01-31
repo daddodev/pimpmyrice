@@ -563,9 +563,36 @@ jobs:
           cp macos_binary/* release/
           cp macos_dmg/* release/
 
+      - name: Extract changelog for version
+        id: changelog
+        run: |
+          VERSION="${{ needs.details.outputs.new_version }}"
+          # Extract section for this version from CHANGELOG.md (from "## [VERSION]" to next "## [" or EOF)
+          CHANGELOG_SECTION=$(awk -v ver="$VERSION" '
+            BEGIN { found=0 }
+            /^## \[/ {
+              if (found) exit
+              if (match($0, "^## \\[" ver "\\]")) { found=1; print; next }
+            }
+            found { print }
+          ' CHANGELOG.md)
+
+          if [ -n "$CHANGELOG_SECTION" ]; then
+            echo "Found changelog section for version $VERSION"
+            echo "$CHANGELOG_SECTION" > release_notes.md
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No changelog section found for version $VERSION, will use auto-generated notes"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         id: create_release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create ${{ needs.details.outputs.tag_name }} release/* --title ${{ needs.details.outputs.tag_name }} --generate-notes
+          if [ "${{ steps.changelog.outputs.found }}" = "true" ]; then
+            gh release create ${{ needs.details.outputs.tag_name }} release/* --title ${{ needs.details.outputs.tag_name }} --notes-file release_notes.md
+          else
+            gh release create ${{ needs.details.outputs.tag_name }} release/* --title ${{ needs.details.outputs.tag_name }} --generate-notes
+          fi
