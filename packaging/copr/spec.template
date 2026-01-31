@@ -9,7 +9,7 @@ Source0:        %{name}-%{version}.tar.gz
 
 BuildArch:      noarch
 
-BuildRequires:  python3-devel, python3-build, python3-setuptools, python3-wheel, python3-pip
+BuildRequires:  python3-devel, python3-build, python3-hatchling
 
 AutoReq: no
 
@@ -31,11 +31,11 @@ A longer description of the package.
 %autosetup
 
 %build
-python3 -m build --no-isolation -s
+python3 -m build --no-isolation -w
 
 %install
 %{__mkdir_p} %{buildroot}%{python3_sitelib}
-python3 -m pip install --no-index --no-build-isolation --root=%{buildroot} --prefix=/usr --no-deps --ignore-installed dist/%{name}-%{version}.tar.gz
+python3 -m pip install --no-index --no-build-isolation --root=%{buildroot} --prefix=/usr --no-deps --ignore-installed dist/%{name}-%{version}-*.whl
 
 
 %files

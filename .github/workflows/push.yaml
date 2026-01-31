@@ -17,8 +17,7 @@ jobs:
       - id: setver
         run: echo "python-version=3.10" >> $GITHUB_OUTPUT
 
-
-# LINTING
+  # LINTING
 
   ruff_lint:
     name: Ruff (Lint)
@@ -28,19 +27,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.10'
+          version: "3.10"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          uv sync --group dev
 
       - name: Run Ruff linter
-        run: python -m ruff check src/pimpmyrice tests
-
+        run: uv run ruff check src/pimpmyrice tests
 
   mypy:
     name: Mypy
@@ -50,19 +47,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.10'
+          version: "3.10"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          uv sync --group dev
 
       - name: Run Mypy type checks
-        run: python -m mypy src/pimpmyrice tests
-
+        run: uv run mypy src/pimpmyrice tests
 
   # TESTING
 
@@ -74,20 +69,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.10'
+          version: "3.10"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          uv sync --group dev
 
       - name: Run Pytest
         run: |
           mkdir -p reports
-          python -m pytest --junitxml=reports/test-results.xml
+          uv run pytest --junitxml=reports/test-results.xml
 
       - name: Upload test results
         if: always()
@@ -95,7 +89,6 @@ jobs:
         with:
           name: test-results
           path: reports/test-results.xml
-
 
   # FORMATTING
 
@@ -107,19 +100,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.10'
+          version: "3.10"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          uv sync --group dev
 
       - name: Check code format with Ruff
-        run: python -m ruff format --check --diff src/pimpmyrice tests
-
+        run: uv run ruff format --check --diff src/pimpmyrice tests
 
   isort:
     name: Isort
@@ -129,15 +120,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
         with:
-          python-version: '3.10'
+          version: "3.10"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          uv sync --group dev
 
       - name: Check imports with Isort
-        run: python -m isort --check --diff src/pimpmyrice tests
+        run: uv run isort --check --diff src/pimpmyrice tests

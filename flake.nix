@@ -27,30 +27,19 @@
         # in
         #   pkgs.mkShell { packages = [ pythonEnv ]; };
         pkgs.mkShell {
-          buildInputs = with pkgs.python3Packages; [
-            pkgs.python3
-            pip
-            build
+          buildInputs = with pkgs; [
+            # Core Python
+            python3
+            # UV for package management
+            uv
+            # Development tools (still available for system use)
             ruff
             mypy
             isort
-            python-lsp-server
-            pylsp-mypy
-            pyls-isort
-            pytest
-            pytest-asyncio
-            types-requests
-            types-pyyaml
-            numpy
-            rich
-            docopt
-            pyyaml
-            jinja2
-            requests
-            psutil
-            pillow
-            pydantic
-            typing-extensions
+            python3Packages.python-lsp-server
+            python3Packages.python-lsp-ruff
+            python3Packages.pylsp-mypy
+            python3Packages.pyls-isort
           ];
 
           shellHook = ''
@@ -60,17 +49,19 @@
             fi
 
             if [ ! -d ".venv" ]; then
-              echo "Creating virtual environment and installing dependencies..."
-              python3 -m venv .venv
-              source .venv/bin/activate
-              # pip install ~/development/iothingy
-              # pip install homeassistant_api
-              # pip install --editable ".[dev]"
-              pip install --editable .
+              echo "Creating virtual environment and installing dependencies with uv..."
+              uv venv
+              uv sync --dev
+
+              echo "Installing in editable mode..."
+              uv pip install -e .
             else
-              echo "Virtual environment already set up. Activating..."
-              source .venv/bin/activate
+              echo "Virtual environment already set up. Syncing dependencies with uv..."
+              uv sync --dev
             fi
+
+            # Source the virtual environment
+            source .venv/bin/activate
           '';
         };
 

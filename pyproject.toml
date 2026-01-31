@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "pimpmyrice"
@@ -49,11 +49,21 @@ dev = [
 [project.scripts]
 pimp = "pimpmyrice.__main__:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/pimpmyrice"]
 
-[tool.setuptools.package-data]
-pimpmyrice = ["assets/*.json"]
+[tool.hatch.build.targets.wheel.sources]
+"src" = ""
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src",
+  "/README.md",
+  "/LICENSE",
+]
+
+[tool.hatch.build.targets.wheel.shared-data]
+"src/pimpmyrice/assets" = "pimpmyrice/assets"
 
 
 
@@ -92,3 +102,15 @@ strict = true
 
 [tool.isort]
 profile = "black"
+
+[dependency-groups]
+dev = [
+  "python-lsp-server",
+  "ruff",
+  "mypy",
+  "isort",
+  "pytest",
+  "pytest-asyncio",
+  "types-requests",
+  "types-PyYAML",
+]
