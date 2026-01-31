@@ -20,7 +20,13 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
-from pimpmyrice.config_paths import CLIENT_OS, HOME_DIR, MODULES_DIR, TEMP_DIR, Os
+from pimpmyrice.config_paths import (
+    CLIENT_OS,
+    HOME_DIR,
+    MODULES_DIR,
+    PIMP_RUNTIME_DIR,
+    Os,
+)
 from pimpmyrice.exceptions import IfCheckFailed
 from pimpmyrice.files import load_yaml
 from pimpmyrice.logger import current_module
@@ -718,7 +724,7 @@ async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
     else:
         cmd = f'GIT_TERMINAL_PROMPT=0 git clone "{url}" {random}'
 
-    r = await run_shell_command(cmd, cwd=TEMP_DIR)
+    r = await run_shell_command(cmd, cwd=PIMP_RUNTIME_DIR)
     if r.out:
         log.debug(f'git clone "{url}" stdout:\n{r.out}')
     if r.err:
@@ -729,7 +735,7 @@ async def clone_from_git(url: str, out_dir: Path = MODULES_DIR) -> str:
             f'git clone failed with code {r.returncode}:\r\n{r.err}\r\nrepository "{url}" not found'
         )
 
-    shutil.move(TEMP_DIR / random, dest_dir)
+    shutil.move(PIMP_RUNTIME_DIR / random, dest_dir)
 
     return name
 

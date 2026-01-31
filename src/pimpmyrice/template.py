@@ -4,7 +4,12 @@ from typing import Any
 
 import jinja2
 
-from pimpmyrice.config_paths import CONFIG_DIR, HOME_DIR, MODULES_DIR, PIMP_CONFIG_DIR
+from pimpmyrice.config_paths import (
+    OS_CONFIG_DIR,
+    HOME_DIR,
+    MODULES_DIR,
+    PIMP_CONFIG_DIR,
+)
 from pimpmyrice.exceptions import ReferenceNotFound
 
 
@@ -104,7 +109,7 @@ def parse_string_vars(
 
     d = {
         "home_dir": HOME_DIR,
-        "config_dir": CONFIG_DIR,
+        "config_dir": OS_CONFIG_DIR,
         "pimp_config_dir": PIMP_CONFIG_DIR,
     }
     if module_name:

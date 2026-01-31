@@ -18,8 +18,8 @@ from pimpmyrice.config_paths import (
     PALETTE_GENERATORS_DIR,
     PALETTES_DIR,
     STYLES_DIR,
-    TEMP_DIR,
     THEMES_DIR,
+    PIMP_RUNTIME_DIR,
 )
 
 log = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ def create_config_dirs() -> None:
         PALETTES_DIR,
         MODULES_DIR,
         PALETTE_GENERATORS_DIR,
-        TEMP_DIR,
+        PIMP_RUNTIME_DIR,
         JSON_SCHEMA_DIR,
     ]:
         dir.mkdir(exist_ok=True, parents=True)
@@ -169,13 +169,13 @@ def create_config_dirs() -> None:
     #     create_venv()
 
 
-def download_file(url: str, destination: Path = TEMP_DIR) -> Path:
+def download_file(url: str, destination: Path = PIMP_RUNTIME_DIR) -> Path:
     """
     Download a file to a destination directory, guessing extension.
 
     Args:
         url (str): HTTP(S) URL.
-        destination (Path): Destination dir. Defaults to TEMP_DIR.
+        destination (Path): Destination dir. Defaults to PIMP_RUNTIME_DIR.
 
     Returns:
         Path: Path to downloaded file.

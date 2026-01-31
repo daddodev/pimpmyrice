@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pimpmyrice import module_utils as mutils
-from pimpmyrice.config_paths import LOCK_FILE, MODULES_DIR, REPOS_BASE_ADDR
+from pimpmyrice.config_paths import CORE_PID_FILE, MODULES_DIR, REPOS_BASE_ADDR
 from pimpmyrice.files import save_yaml
 from pimpmyrice.module_utils import (
     FileAction,
@@ -98,10 +98,10 @@ class ModuleManager:
         """
         # TODO separate modules by type (run, pre_run, palette_generators...)
 
-        if is_locked(LOCK_FILE)[0]:
+        if is_locked(CORE_PID_FILE)[0]:
             raise Exception("another instance is applying a theme!")
 
-        with Lock(LOCK_FILE):
+        with Lock(CORE_PID_FILE):
             timer = Timer()
 
             for m in [*(include_modules or []), *(exclude_modules or [])]:
