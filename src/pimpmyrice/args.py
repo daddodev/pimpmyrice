@@ -89,10 +89,15 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
         elif args["delete"]:
             await tm.delete_theme(args["THEME"])
             return
+
         elif args["export"]:
             await tm.export_theme(
                 args["THEME"], out_dir=Path(args["OUT_DIR"]).absolute(), **options
             )
+            return
+
+        elif args["rewrite"]:
+            await tm.rewrite_themes(name_includes=args["--name"])
             return
 
     elif args["module"]:
@@ -127,6 +132,10 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
         elif args["disable"]:
             for module_name in args["MODULES"]:
                 await tm.mm.set_enabled(module_name, False)
+            return
+
+        elif args["rewrite"]:
+            await tm.mm.rewrite_modules(name_includes=args["--name"])
             return
 
         elif args["run"]:
@@ -188,13 +197,5 @@ modules: {len(tm.mm.modules)}
         for theme_name in args["THEMES"]:
             await tm.rewrite_themes(regen_colors=True, name_includes=theme_name)
         return
-
-    elif args["rewrite"]:
-        if args["themes"]:
-            await tm.rewrite_themes(name_includes=args["--name"])
-            return
-        elif args["modules"]:
-            await tm.mm.rewrite_modules(name_includes=args["--name"])
-            return
 
     log.error("not implemented")
