@@ -17,9 +17,9 @@ from pimpmyrice.config_paths import (
     MODULES_DIR,
     PALETTE_GENERATORS_DIR,
     PALETTES_DIR,
+    PIMP_RUNTIME_DIR,
     STYLES_DIR,
     THEMES_DIR,
-    PIMP_RUNTIME_DIR,
 )
 
 log = logging.getLogger(__name__)

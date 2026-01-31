@@ -5,9 +5,9 @@ from typing import Any
 import jinja2
 
 from pimpmyrice.config_paths import (
-    OS_CONFIG_DIR,
     HOME_DIR,
     MODULES_DIR,
+    OS_CONFIG_DIR,
     PIMP_CONFIG_DIR,
 )
 from pimpmyrice.exceptions import ReferenceNotFound
