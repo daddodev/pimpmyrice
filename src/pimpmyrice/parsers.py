@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Any, Union
 
 from pimpmyrice.config_paths import CLIENT_OS
-from pimpmyrice.files import load_json, load_yaml
+from pimpmyrice.files import load_json, load_yaml, save_json, save_yaml
+from pimpmyrice.migrations import is_old_syntax, migrate_module_dict
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme, Wallpaper
 
@@ -94,6 +95,8 @@ def parse_module(module_path: Path) -> Module:
     """
     Parse a module directory from YAML/JSON definition into a `Module`.
 
+    Automatically migrates old syntax (pre-0.5.0) to new format if needed.
+
     Args:
         module_path (Path): Module directory path.
 
@@ -111,7 +114,14 @@ def parse_module(module_path: Path) -> Module:
     else:
         raise Exception("module.{json,yaml} not found")
 
-    # Add module_name to all actions for context
+    if is_old_syntax(data):
+        log.info(f"migrating module '{module_name}' to new syntax")
+        data = migrate_module_dict(data)
+        if module_yaml.exists():
+            save_yaml(module_yaml, data)
+        elif module_json.exists():
+            save_json(module_json, data)
+
     _inject_module_name_into_actions(data, module_name)
 
     module = Module(**data, name=module_name)
