@@ -4,14 +4,13 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-import rich
+import rich.pretty
 
 from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
 from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
-from pimpmyrice.events import EventHandler
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
 from pimpmyrice.module import ModuleManager
 from pimpmyrice.theme_utils import (
@@ -46,7 +45,6 @@ class ThemeManager:
         self.tags: set[str] = set()
         self.themes = self.get_themes()
         self.config = self.get_config()
-        self.event_handler = EventHandler()
         self.mm = ModuleManager()
 
         # TODO move
@@ -109,7 +107,6 @@ class ThemeManager:
         save_json(BASE_STYLE_FILE, base_style)
         self.base_style = base_style
         schemas.generate_theme_json_schema(self)
-        await self.event_handler.publish("theme_applied")
 
     @staticmethod
     def get_styles() -> dict[str, Style]:
@@ -232,8 +229,6 @@ class ThemeManager:
         # TODO generate name here
         await self.save_theme(theme)
         log.info(f'theme "{theme.name}" generated')
-
-        await self.event_handler.publish("themes_changed")
 
         if apply:
             await self.apply_theme(theme.name)
@@ -393,8 +388,6 @@ class ThemeManager:
 
         log.info(f'theme "{theme_name}" deleted')
 
-        await self.event_handler.publish("themes_changed")
-
     async def apply_theme(
         self,
         theme_name: str | None = None,
@@ -455,8 +448,6 @@ class ThemeManager:
         self.save_config()
 
         log.info(f'theme "{theme_name}" {mode_name} applied')
-
-        await self.event_handler.publish("theme_applied")
 
     async def set_random_theme(
         self,
