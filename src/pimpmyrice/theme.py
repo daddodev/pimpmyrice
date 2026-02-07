@@ -12,6 +12,7 @@ from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
 from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
+from pimpmyrice.migrations import migrate_style_dict
 from pimpmyrice.module import ModuleManager
 from pimpmyrice.theme_utils import (
     Mode,
@@ -119,8 +120,17 @@ class ThemeManager:
         styles: dict[str, Style] = {}
         for f in STYLES_DIR.iterdir():
             try:
-                style_data = load_json(f)
-                styles[f.stem] = parse_colors_in_style(style_data)
+                if f.is_file() and f.suffix == ".json":
+                    style_data = load_json(f)
+                    migrated = migrate_style_dict(style_data)
+                    if migrated is not None:
+                        log.info(f"migrating style '{f.stem}' to new syntax")
+                        save_json(f, migrated)
+                        style_data = migrated
+                    styles[f.stem] = parse_colors_in_style(style_data)
+                else:
+                    style_data = load_json(f)
+                    styles[f.stem] = parse_colors_in_style(style_data)
             except Exception as e:
                 log.error(f'Failed to load style "{f.stem}": {e}')
                 continue

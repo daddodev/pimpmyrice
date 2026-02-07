@@ -5,7 +5,7 @@ from typing import Any, Union
 
 from pimpmyrice.config_paths import CLIENT_OS
 from pimpmyrice.files import load_json, load_yaml, save_json, save_yaml
-from pimpmyrice.migrations import is_old_syntax, migrate_module_dict
+from pimpmyrice.migrations import migrate_module_dict, migrate_theme_dict
 from pimpmyrice.module_utils import Module
 from pimpmyrice.theme_utils import Theme, Wallpaper
 
@@ -15,41 +15,38 @@ log = logging.getLogger(__name__)
 def parse_wallpaper(
     wallpaper: Union[dict[str, Any], str], theme_path: Path
 ) -> Wallpaper:
-    """
-    Parse a wallpaper entry into a `Wallpaper` model.
-
-    Args:
-        wallpaper (dict[str, Any] | str): Wallpaper config or relative path.
-        theme_path (Path): Theme directory used to resolve relative paths.
-
-    Returns:
-        Wallpaper: Parsed wallpaper model.
-    """
+    """Parse a wallpaper entry into a Wallpaper model."""
     match wallpaper:
         case str(wallpaper):
             return Wallpaper(path=theme_path / wallpaper)
         case dict(wallpaper):
             return Wallpaper(**{**wallpaper, "path": theme_path / wallpaper["path"]})
         case _:
-            raise Exception('"wallpaper" must be a string or a dict')
+            raise Exception("wallpaper must be a string or a dict")
 
 
-def parse_theme(
-    path: Path,
-) -> Theme:
+def parse_theme(path: Path) -> Theme:
     """
-    Parse a theme directory (theme.json + assets) into a `Theme` model.
+    Parse a theme directory (theme.json + assets) into a Theme model.
+
+    Automatically migrates old syntax (pre-0.5.0) to new format if needed.
 
     Args:
-        path (Path): Theme directory path.
+        path: Theme directory path.
 
     Returns:
-        Theme: Parsed theme model.
+        Parsed Theme model.
     """
     name = path.name
     theme_file = path / "theme.json"
 
     data = load_json(theme_file)
+
+    migrated = migrate_theme_dict(data)
+    if migrated is not None:
+        log.info(f"migrating theme '{name}' to new syntax")
+        save_json(theme_file, migrated)
+        data = migrated
 
     data["last_modified"] = os.path.getmtime(theme_file) * 1000
 
@@ -65,8 +62,7 @@ def parse_theme(
                 else:
                     mode["wallpaper"] = parse_wallpaper(mode["wallpaper"], path)
 
-    theme = Theme(**data, name=name, path=path)
-    return theme
+    return Theme(**data, name=name, path=path)
 
 
 def _inject_module_name_into_actions(data: dict[str, Any], module_name: str) -> None:
@@ -80,12 +76,10 @@ def _inject_module_name_into_actions(data: dict[str, Any], module_name: str) -> 
         elif isinstance(actions, dict):
             actions["module_name"] = module_name
 
-    # Process on_events
     if "on_events" in data and isinstance(data["on_events"], dict):
         for actions in data["on_events"].values():
             add_name(actions)
 
-    # Process scripts
     if "scripts" in data and isinstance(data["scripts"], dict):
         for actions in data["scripts"].values():
             add_name(actions)
@@ -93,15 +87,15 @@ def _inject_module_name_into_actions(data: dict[str, Any], module_name: str) -> 
 
 def parse_module(module_path: Path) -> Module:
     """
-    Parse a module directory from YAML/JSON definition into a `Module`.
+    Parse a module directory from YAML/JSON definition into a Module.
 
     Automatically migrates old syntax (pre-0.5.0) to new format if needed.
 
     Args:
-        module_path (Path): Module directory path.
+        module_path: Module directory path.
 
     Returns:
-        Module: Parsed module model.
+        Parsed Module model.
     """
     module_name = module_path.name
     module_yaml = module_path / "module.yaml"
@@ -109,18 +103,20 @@ def parse_module(module_path: Path) -> Module:
 
     if module_yaml.exists():
         data = load_yaml(module_yaml)
+        file_path = module_yaml
+        save_func = save_yaml
     elif module_json.exists():
         data = load_json(module_json)
+        file_path = module_json
+        save_func = save_json
     else:
         raise Exception("module.{json,yaml} not found")
 
-    if is_old_syntax(data):
+    migrated = migrate_module_dict(data)
+    if migrated is not None:
         log.info(f"migrating module '{module_name}' to new syntax")
-        data = migrate_module_dict(data)
-        if module_yaml.exists():
-            save_yaml(module_yaml, data)
-        elif module_json.exists():
-            save_json(module_json, data)
+        save_func(file_path, migrated)
+        data = migrated
 
     _inject_module_name_into_actions(data, module_name)
 
@@ -145,44 +141,38 @@ def clean_module_dump(data: dict[str, Any]) -> dict[str, Any]:
     - Empty lists and dicts
 
     Args:
-        data (dict[str, Any]): Module dump data.
+        data: Module dump data.
 
     Returns:
-        dict[str, Any]: Cleaned data.
+        Cleaned data.
     """
     from pimpmyrice.config_paths import Os
 
     cleaned: dict[str, Any] = {}
 
     for key, value in data.items():
-        # Skip excluded fields
         if key == "name":
             continue
 
-        # Skip enabled if true (default)
         if key == "enabled" and value is True:
             continue
 
-        # Skip os if it contains all OS values (default)
         if key == "os":
             if isinstance(value, list) and set(value) == set(Os):
                 continue
 
-        # Skip empty on_events sub-fields
         if key == "on_events" and isinstance(value, dict):
             cleaned_on_events: dict[str, Any] = {}
             for event_name, actions in value.items():
-                if actions:  # Only keep non-empty lists
+                if actions:
                     cleaned_on_events[event_name] = actions
             if cleaned_on_events:
                 cleaned[key] = cleaned_on_events
             continue
 
-        # Skip empty scripts
         if key == "scripts" and not value:
             continue
 
-        # Skip empty lists and dicts
         if value in ([], {}):
             continue
 
