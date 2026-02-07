@@ -41,7 +41,7 @@ Usage:
     pimp module install MODULE_URL...                         [options]
     pimp module clone MODULE_URL... [--out=OUT_DIR]           [options]
     pimp module init MODULE                                   [options]
-    pimp module run MODULE COMMAND [COMMAND_ARGS...]          [options]
+    pimp module script MODULE SCRIPT [SCRIPT_ARGS...]         [options]
     pimp module create MODULE_NAME                            [options]
     pimp module delete MODULES...                             [options]
     pimp module enable MODULES...                             [options]

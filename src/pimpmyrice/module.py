@@ -14,15 +14,16 @@ from pimpmyrice.module_utils import (
     IfRunningAction,
     Module,
     ModuleState,
+    OnEvents,
     PythonAction,
     ShellAction,
     module_context_wrapper,
 )
-from pimpmyrice.parsers import parse_module
+from pimpmyrice.parsers import clean_module_dump, parse_module
 from pimpmyrice.utils import AttrDict, Lock, Timer, is_locked
 
 if TYPE_CHECKING:
-    from pimpmyrice.theme import ThemeManager
+    from pimpmyrice.theme_manager import ThemeManager
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ class ModuleManager:
     """
     Manage discovery, lifecycle, and execution of modules.
 
-    Loads modules from disk, runs their pre-run/run actions, and provides
+    Loads modules from disk, runs their lifecycle actions, and provides
     helpers for install, clone, init, rewrite, and deletion.
     """
 
@@ -85,7 +86,12 @@ class ModuleManager:
         out_dir: Path | None = None,
     ) -> dict[str, ModuleState]:
         """
-        Run pre-run and run actions for eligible modules.
+        Run lifecycle actions for eligible modules.
+
+        Execution flow:
+        1. before_theme_apply: sequential execution, can transform theme_dict
+        2. theme_apply: parallel execution, main theming actions
+        3. after_theme_apply: runs after theme_apply completes
 
         Args:
             theme_dict (AttrDict): Generated theme dictionary.
@@ -96,8 +102,6 @@ class ModuleManager:
         Returns:
             dict[str, ModuleState]: Final state of each module.
         """
-        # TODO separate modules by type (run, pre_run, palette_generators...)
-
         if is_locked(CORE_PID_FILE)[0]:
             raise Exception("another instance is applying a theme!")
 
@@ -109,66 +113,97 @@ class ModuleManager:
                     raise Exception(f'module "{m}" not found')
 
             modules_state: dict[str, ModuleState] = {}
-            pre_runners = []
-            runners = []
+            before_runners = []
+            theme_runners = []
+            after_runners = []
 
             for module_name, module in self.modules.items():
                 if (
                     (include_modules and module_name not in include_modules)
                     or (exclude_modules and module_name in exclude_modules)
                     or not module.enabled
-                    or not (module.pre_run or module.run)
                 ):
+                    modules_state[module_name] = ModuleState.SKIPPED
+                    continue
+
+                # Check if module has any lifecycle actions
+                has_actions = (
+                    module.on_events.before_theme_apply
+                    or module.on_events.theme_apply
+                    or module.on_events.after_theme_apply
+                )
+                if not has_actions:
                     modules_state[module_name] = ModuleState.SKIPPED
                     continue
 
                 modules_state[module_name] = ModuleState.PENDING
 
-                if module.pre_run:
-                    pre_runners.append(module_name)
-                if module.run:
-                    runners.append(module_name)
+                if module.on_events.before_theme_apply:
+                    before_runners.append(module_name)
+                if module.on_events.theme_apply:
+                    theme_runners.append(module_name)
+                if module.on_events.after_theme_apply:
+                    after_runners.append(module_name)
 
-            if len(runners) == 0:
+            if (
+                len(theme_runners) == 0
+                and len(before_runners) == 0
+                and len(after_runners) == 0
+            ):
                 raise Exception(
                     f"no modules to run!\nSee {REPOS_BASE_ADDR} for available modules"
                 )
 
-            for name in pre_runners:
+            # Stage 1: before_theme_apply (sequential, transforms theme_dict)
+            log.debug(f"running before_theme_apply for {len(before_runners)} modules")
+            for name in before_runners:
                 mod_res = await module_context_wrapper(
                     name,
                     modules_state,
-                    self.modules[name].execute_pre_run(deepcopy(theme_dict)),
+                    self.modules[name].execute_before_theme_apply(deepcopy(theme_dict)),
                 )
-                if not mod_res:
-                    continue
-
-                theme_dict = mod_res
+                if mod_res and isinstance(mod_res, AttrDict):
+                    theme_dict = mod_res
 
                 modules_state[name] = (
                     ModuleState.RUNNING
-                    if self.modules[name].run
+                    if self.modules[name].on_events.theme_apply
+                    or self.modules[name].on_events.after_theme_apply
                     else ModuleState.COMPLETED
                 )
 
-            runners_tasks = [
+            # Stage 2: theme_apply (parallel)
+            log.debug(f"running theme_apply for {len(theme_runners)} modules")
+            theme_tasks = [
                 module_context_wrapper(
                     name,
                     modules_state,
-                    self.modules[name].execute_run(
+                    self.modules[name].execute_theme_apply(
                         theme_dict, modules_state=modules_state, out_dir=out_dir
                     ),
                 )
-                for name in runners
+                for name in theme_runners
             ]
 
-            for t in asyncio.as_completed(runners_tasks):
+            for t in asyncio.as_completed(theme_tasks):
                 try:
                     await t
                 except Exception as e:
                     log.debug("exception:", exc_info=e)
                     log.error(str(e))
 
+            # Stage 3: after_theme_apply (sequential after theme_apply)
+            log.debug(f"running after_theme_apply for {len(after_runners)} modules")
+            for name in after_runners:
+                await module_context_wrapper(
+                    name,
+                    modules_state,
+                    self.modules[name].execute_after_theme_apply(
+                        theme_dict, modules_state=modules_state
+                    ),
+                )
+
+            # Final state accounting
             completed = skipped = failed = 0
             for state in modules_state.values():
                 match state:
@@ -189,23 +224,23 @@ class ModuleManager:
 
             return modules_state
 
-    async def run_module_command(
+    async def run_module_script(
         self,
         tm: ThemeManager,
         module_name: str,
-        command: str,
+        script: str,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         """
-        Execute a custom command exposed by a module.
+        Execute a custom script exposed by a module.
 
         Args:
             tm (ThemeManager): Theme manager instance.
             module_name (str): Target module.
-            command (str): Command name.
-            *args (Any): Positional arguments passed to the command.
-            **kwargs (Any): Keyword arguments passed to the command.
+            script (str): Script name.
+            *args (Any): Positional arguments passed to the script.
+            **kwargs (Any): Keyword arguments passed to the script.
 
         Returns:
             None
@@ -214,7 +249,7 @@ class ModuleManager:
             raise Exception(f'module "{module_name}" not found')
 
         module = self.modules[module_name]
-        await module.execute_command(command, tm, *args, **kwargs)
+        await module.execute_script(script, tm, *args, **kwargs)
 
     async def rewrite_modules(
         self,
@@ -235,9 +270,9 @@ class ModuleManager:
                 continue
 
             dump = module.model_dump(mode="json")
+            dump = clean_module_dump(dump)
 
             save_yaml(MODULES_DIR / module.name / "module.yaml", dump)
-            # save_json(MODULES_DIR / module.name / "module.json", dump)
             log.info(f'module "{module.name}" rewritten')
 
     async def create_module(self, module_name: str) -> None:
@@ -260,19 +295,27 @@ class ModuleManager:
         module = Module(
             name=module_name,
             enabled=False,
-            run=[
-                IfRunningAction(module_name=module_name, program_name="someprogram"),
-                FileAction(
-                    module_name=module_name,
-                    target="{{module_dir}}/example_output/config",
-                ),
-                ShellAction(module_name=module_name, command="somecommand"),
-                PythonAction(
-                    module_name=module_name,
-                    py_file_path="apply.py",
-                    function_name="main",
-                ),
-            ],
+            on_events=OnEvents(
+                theme_apply=[
+                    IfRunningAction(
+                        module_name=module_name,
+                        program_name="someprogram",
+                    ),
+                    FileAction(
+                        module_name=module_name,
+                        target="{{module_dir}}/example_output/config",
+                    ),
+                    ShellAction(
+                        module_name=module_name,
+                        command="somecommand",
+                    ),
+                    PythonAction(
+                        module_name=module_name,
+                        py_file_path="apply.py",
+                        function_name="main",
+                    ),
+                ]
+            ),
         )
         module_path = MODULES_DIR / module.name
 
@@ -281,6 +324,7 @@ class ModuleManager:
         (module_path / "files").mkdir()
 
         dump = module.model_dump(mode="json")
+        dump = clean_module_dump(dump)
         save_yaml(module_path / "module.yaml", dump)
 
         with open(module_path / "apply.py", "w", encoding="utf-8") as f:
@@ -399,6 +443,7 @@ class ModuleManager:
 
         module.enabled = enabled
         dump = module.model_dump(mode="json")
+        dump = clean_module_dump(dump)
         save_yaml(MODULES_DIR / module.name / "module.yaml", dump)
         status = "enabled" if enabled else "disabled"
         log.info(f'module "{module_name}" {status}')

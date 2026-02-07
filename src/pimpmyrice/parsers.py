@@ -68,6 +68,28 @@ def parse_theme(
     return theme
 
 
+def _inject_module_name_into_actions(data: dict[str, Any], module_name: str) -> None:
+    """Add module_name to all actions in the module data for context."""
+
+    def add_name(actions: Any) -> None:
+        if isinstance(actions, list):
+            for action in actions:
+                if isinstance(action, dict):
+                    action["module_name"] = module_name
+        elif isinstance(actions, dict):
+            actions["module_name"] = module_name
+
+    # Process on_events
+    if "on_events" in data and isinstance(data["on_events"], dict):
+        for actions in data["on_events"].values():
+            add_name(actions)
+
+    # Process scripts
+    if "scripts" in data and isinstance(data["scripts"], dict):
+        for actions in data["scripts"].values():
+            add_name(actions)
+
+
 def parse_module(module_path: Path) -> Module:
     """
     Parse a module directory from YAML/JSON definition into a `Module`.
@@ -89,18 +111,71 @@ def parse_module(module_path: Path) -> Module:
     else:
         raise Exception("module.{json,yaml} not found")
 
-    for param in ["init", "pre_run", "run"]:
-        for action in data.get(param, []):
-            if isinstance(action, dict):
-                action["module_name"] = module_name
-
-    for cmd_name, cmd in data.get("commands", {}).items():
-        cmd["module_name"] = module_name
+    # Add module_name to all actions for context
+    _inject_module_name_into_actions(data, module_name)
 
     module = Module(**data, name=module_name)
 
     if CLIENT_OS not in module.os:
         module.enabled = False
-        log.warn(f'module "{module.name}" disabled: not compatible with {CLIENT_OS}')
+        log.warning(f'module "{module.name}" disabled: not compatible with {CLIENT_OS}')
 
     return module
+
+
+def clean_module_dump(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Remove empty/default values from module dump for cleaner YAML output.
+
+    Removes:
+    - enabled: true (default)
+    - os with all OS values (default)
+    - Empty on_events sub-fields
+    - Empty scripts dict
+    - Empty lists and dicts
+
+    Args:
+        data (dict[str, Any]): Module dump data.
+
+    Returns:
+        dict[str, Any]: Cleaned data.
+    """
+    from pimpmyrice.config_paths import Os
+
+    cleaned: dict[str, Any] = {}
+
+    for key, value in data.items():
+        # Skip excluded fields
+        if key == "name":
+            continue
+
+        # Skip enabled if true (default)
+        if key == "enabled" and value is True:
+            continue
+
+        # Skip os if it contains all OS values (default)
+        if key == "os":
+            if isinstance(value, list) and set(value) == set(Os):
+                continue
+
+        # Skip empty on_events sub-fields
+        if key == "on_events" and isinstance(value, dict):
+            cleaned_on_events: dict[str, Any] = {}
+            for event_name, actions in value.items():
+                if actions:  # Only keep non-empty lists
+                    cleaned_on_events[event_name] = actions
+            if cleaned_on_events:
+                cleaned[key] = cleaned_on_events
+            continue
+
+        # Skip empty scripts
+        if key == "scripts" and not value:
+            continue
+
+        # Skip empty lists and dicts
+        if value in ([], {}):
+            continue
+
+        cleaned[key] = value
+
+    return cleaned

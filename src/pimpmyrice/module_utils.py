@@ -30,7 +30,10 @@ from pimpmyrice.config_paths import (
 from pimpmyrice.exceptions import IfCheckFailed
 from pimpmyrice.files import load_yaml
 from pimpmyrice.logger import current_module
-from pimpmyrice.template import parse_string_vars, render_template_file
+from pimpmyrice.template import (
+    parse_string_vars,
+    render_template_file,
+)
 from pimpmyrice.utils import AttrDict, Timer, is_process_running
 
 if TYPE_CHECKING:
@@ -433,56 +436,77 @@ class AppendAction(BaseModel):
         log.info(f'init: appended content to "{destination_path}"')
 
 
-ModuleInit = Union[LinkAction, AppendAction]
-ModulePreRun = Union[PythonAction]
-ModuleRun = Union[ShellAction, FileAction, PythonAction, IfRunningAction, WaitForAction]
-ModuleCommand = Union[PythonAction]
+# Action type unions for different lifecycle stages
+ModuleInitAction = Union[LinkAction, AppendAction]
+ModuleLifecycleAction = Union[
+    ShellAction, FileAction, PythonAction, IfRunningAction, WaitForAction
+]
+ModuleScriptAction = Union[ShellAction, FileAction, PythonAction, IfRunningAction]
+
+
+class OnEvents(BaseModel):
+    """Lifecycle hooks for module execution."""
+
+    module_install: list[ModuleInitAction] = []
+    before_theme_apply: list[ModuleLifecycleAction] = []
+    theme_apply: list[ModuleLifecycleAction] = []
+    after_theme_apply: list[ModuleLifecycleAction] = []
+    theme_applied: list[ModuleLifecycleAction] = []
+    themes_changed: list[ModuleLifecycleAction] = []
+
+    model_config = ConfigDict(extra="allow")
 
 
 class Module(BaseModel):
-    """Module definition and execution helpers for actions and commands."""
+    """Module definition with lifecycle hooks and scripts."""
 
     name: SkipJsonSchema[str] = Field(exclude=True)
     enabled: bool = True
     os: list[Os] = list(Os)
-    init: list[ModuleInit] = []
-    pre_run: list[ModulePreRun] = []
-    run: list[ModuleRun] = []
-    commands: dict[str, ModuleCommand] = {}
+    on_events: OnEvents = Field(default_factory=OnEvents)
+    scripts: dict[str, list[ModuleScriptAction]] = {}
 
-    async def execute_command(
-        self, command_name: str, tm: ThemeManager, *args: Any, **kwargs: Any
+    async def execute_script(
+        self, script_name: str, tm: ThemeManager, *args: Any, **kwargs: Any
     ) -> None:
         """
-        Execute a named command defined in the module.
+        Execute a named script defined in the module.
 
         Args:
-            command_name (str): Command key.
+            script_name (str): Script key.
             tm (ThemeManager): Theme manager instance.
-            *args (Any): Positional arguments for the command.
-            **kwargs (Any): Keyword arguments for the command.
+            *args (Any): Positional arguments for the script.
+            **kwargs (Any): Keyword arguments for the script.
 
         Returns:
             None
         """
-        if command_name not in self.commands:
+        if script_name not in self.scripts:
             raise Exception(
-                f'command "{command_name}" not found in [{", ".join(self.commands.keys())}]'
+                f'script "{script_name}" not found in [{", ".join(self.scripts.keys())}]'
             )
 
-        await self.commands[command_name].run(tm=tm, *args, **kwargs)
+        for action in self.scripts[script_name]:
+            await action.run(tm, *args, **kwargs)
 
     async def execute_init(self) -> None:
         """
-        Run initialization actions and set up file/template links.
+        Run module_install actions and set up file/template links.
 
         Returns:
             None
         """
-        for init_action in self.init:
-            await init_action.run()
+        # Run module_install actions
+        for action in self.on_events.module_install:
+            if isinstance(action, (LinkAction, AppendAction)):
+                await action.run()
+            else:
+                log.warning(
+                    f"module_install action {type(action).__name__} not supported"
+                )
 
-        for action in self.run:
+        # Setup file template links for theme_apply actions
+        for action in self.on_events.theme_apply:
             if isinstance(action, FileAction):
                 target = Path(
                     parse_string_vars(
@@ -517,9 +541,10 @@ class Module(BaseModel):
 
         log.info(f'module "{self.name}" initialized')
 
-    async def execute_pre_run(self, theme_dict: AttrDict) -> AttrDict:
+    async def execute_before_theme_apply(self, theme_dict: AttrDict) -> AttrDict:
         """
-        Run pre-run actions and allow them to transform the theme dict.
+        Run before_theme_apply actions and allow them to transform the theme dict.
+        Actions run sequentially.
 
         Args:
             theme_dict (AttrDict): Input theme dictionary.
@@ -527,20 +552,24 @@ class Module(BaseModel):
         Returns:
             AttrDict: Possibly modified theme dictionary.
         """
-        for action in self.pre_run:
-            action_res = await action.run(theme_dict)
-            theme_dict = action_res
+        for action in self.on_events.before_theme_apply:
+            if isinstance(action, WaitForAction):
+                log.warning(f"wait_for action not supported in before_theme_apply")
+            else:
+                action_res = await action.run(theme_dict)
+                if action_res and isinstance(action_res, AttrDict):
+                    theme_dict = action_res
 
         return theme_dict
 
-    async def execute_run(
+    async def execute_theme_apply(
         self,
         theme_dict: AttrDict,
         modules_state: dict[str, Any],
         out_dir: Path | None = None,
     ) -> None:
         """
-        Run main actions (and waits) for the module.
+        Run theme_apply actions for the module.
 
         Args:
             theme_dict (AttrDict): Theme data for rendering/actions.
@@ -559,15 +588,42 @@ class Module(BaseModel):
 
         # output to custom directory (needed for testing)
         if out_dir:
-            for action in self.run:
+            for action in self.on_events.theme_apply:
                 if isinstance(action, FileAction):
-                    # TODO other actions
                     await action.run(theme_dict, out_dir=out_dir)
                 else:
                     log.warning(f"dumping {action} not implemented, skipping")
             return
 
-        for action in self.run:
+        for action in self.on_events.theme_apply:
+            if isinstance(action, WaitForAction):
+                await action.run(theme_dict, modules_state)
+            else:
+                await action.run(theme_dict)
+
+    async def execute_after_theme_apply(
+        self,
+        theme_dict: AttrDict,
+        modules_state: dict[str, Any],
+    ) -> None:
+        """
+        Run after_theme_apply actions for the module.
+
+        Args:
+            theme_dict (AttrDict): Theme data for rendering/actions.
+            modules_state (dict[str, Any]): Shared state for coordination.
+
+        Returns:
+            None
+        """
+        # get_module_dict
+        theme_dict = (
+            theme_dict + theme_dict["modules_styles"][self.name]
+            if self.name in theme_dict["modules_styles"]
+            else deepcopy(theme_dict)
+        )
+
+        for action in self.on_events.after_theme_apply:
             if isinstance(action, WaitForAction):
                 await action.run(theme_dict, modules_state)
             else:

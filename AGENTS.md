@@ -81,6 +81,63 @@ isort src/pimpmyrice
 - `process_keyword_template()`: Evaluate single Jinja2 expressions
 - `parse_string_vars()`: Expand variables and user paths (`{{home_dir}}`, `{{module_dir}}`, etc.)
 
+#### Template Variables Available
+
+Templates use Jinja2 syntax: `{{variable_name}}`
+
+**Global Variables (always available):**
+- `{{home_dir}}` - User's home directory
+- `{{config_dir}}` - OS config directory
+- `{{pimp_config_dir}}` - PimpMyRice config directory (~/.config/pimpmyrice/)
+
+**Module Variables (when module_name is provided):**
+- `{{module_dir}}` - Path to the module directory
+- `{{templates_dir}}` - Path to module's templates subdirectory
+- `{{files_dir}}` - Path to module's files subdirectory
+
+**Theme Variables (in theme_dict):**
+- `{{theme_name}}` - Name of the current theme
+- `{{mode}}` - Current mode (dark/light)
+- `{{wallpaper.path}}` - Path to wallpaper image
+- `{{wallpaper.mode}}` - Wallpaper display mode
+- `{{primary}}`, `{{secondary}}`, `{{background}}`, `{{foreground}}`, `{{accent}}` - Core palette colors
+- All terminal colors: `{{color0}}` through `{{color15}}`
+- Any custom values from styles
+
+**Template Resolution Flow:**
+1. Actions receive a `theme_dict` (AttrDict) containing theme data
+2. `parse_string_vars()` merges global paths + module paths + theme_dict
+3. Jinja2 processes templates with strict undefined checking
+4. Result is returned as a string
+
+**Example Usage:**
+```yaml
+# In module.yaml run actions
+run:
+  - action: shell
+    command: 'wal -i "{{wallpaper.path}}"'
+  - action: file
+    target: "{{config_dir}}/alacritty/alacritty.toml"
+    template: alacritty.toml.j2
+
+# Template file (alacritty.toml.j2) can use:
+# background = "{{background}}"
+# foreground = "{{foreground}}"
+# colors.primary.background = "{{primary}}"
+```
+
+**Event Handler Templates:**
+For `on_events`, the same template system applies:
+```yaml
+on_events:
+  theme_applied:
+    - action: shell
+      command: 'notify-send "Theme: {{theme_name}} ({{mode}})"'
+  themes_changed:
+    - action: shell
+      command: 'echo "Theme {{theme_name}} was {{action}}"'
+```
+
 ### Files & I/O (`files.py`)
 - `load_yaml()` / `save_yaml()`: YAML with automatic schema headers
 - `load_json()` / `save_json()`: JSON with `$schema` embedding

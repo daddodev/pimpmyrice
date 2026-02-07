@@ -32,7 +32,7 @@ class ThemeManager:
     Manage themes, styles, palettes, and module execution.
 
     Orchestrates theme parsing, generation, persistence, application, and
-    integrations with modules and events.
+    integrations with modules.
     """
 
     def __init__(self) -> None:

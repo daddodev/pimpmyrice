@@ -138,12 +138,12 @@ async def process_args(tm: ThemeManager, args: dict[str, Any]) -> None:
             await tm.mm.rewrite_modules(name_includes=args["--name"])
             return
 
-        elif args["run"]:
-            await tm.mm.run_module_command(
+        elif args["script"]:
+            await tm.mm.run_module_script(
                 tm,
                 module_name=args["MODULE"],
-                command=args["COMMAND"],
-                cmd_args=args["COMMAND_ARGS"],
+                script=args["SCRIPT"],
+                script_args=args["SCRIPT_ARGS"],
             )
             return
 
