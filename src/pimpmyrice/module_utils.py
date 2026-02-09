@@ -487,7 +487,12 @@ class Module(BaseModel):
             )
 
         for action in self.scripts[script_name]:
-            await action.run(tm, *args, **kwargs)
+            if isinstance(action, PythonAction):
+                await action.run(tm, *args, **kwargs)
+            else:
+                raise Exception(
+                    f'script action type "{type(action).__name__}" not supported'
+                )
 
     async def execute_init(self) -> None:
         """
@@ -497,12 +502,12 @@ class Module(BaseModel):
             None
         """
         # Run module_install actions
-        for action in self.on_events.module_install:
-            if isinstance(action, (LinkAction, AppendAction)):
-                await action.run()
+        for init_action in self.on_events.module_install:
+            if isinstance(init_action, (LinkAction, AppendAction)):
+                await init_action.run()
             else:
-                log.warning(
-                    f"module_install action {type(action).__name__} not supported"
+                raise Exception(
+                    f'module_install action type "{type(init_action).__name__}" not supported'
                 )
 
         # Setup file template links for theme_apply actions
@@ -554,7 +559,7 @@ class Module(BaseModel):
         """
         for action in self.on_events.before_theme_apply:
             if isinstance(action, WaitForAction):
-                log.warning(f"wait_for action not supported in before_theme_apply")
+                raise Exception("WaitForAction not supported in before_theme_apply")
             else:
                 action_res = await action.run(theme_dict)
                 if action_res and isinstance(action_res, AttrDict):
