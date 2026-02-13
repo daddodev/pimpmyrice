@@ -80,11 +80,9 @@ CORE_PID_FILE = PIMP_RUNTIME_DIR / "core.pid"
 SERVER_PID_FILE = PIMP_RUNTIME_DIR / "server.pid"
 
 # Cache / logs
-LOG_FILE = PIMP_CACHE_DIR / "pimpmyrice.log"
+TEMP_DOWNLOADS_DIR = PIMP_CACHE_DIR / "downloads"
+THUMBNAILS_DIR = PIMP_CACHE_DIR / "thumbnails"
+LOGS_DIR = PIMP_CACHE_DIR / "logs"
 
 # Remote repos
-REPOS_DIR = PIMP_CONFIG_DIR / "remote_repos"
-REPOS_LIST = REPOS_DIR / "list.txt"
-
-
 REPOS_BASE_ADDR = "https://github.com/pimpmyrice-modules"

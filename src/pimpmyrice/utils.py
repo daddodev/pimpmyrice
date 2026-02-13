@@ -10,6 +10,8 @@ from typing import Any
 import psutil
 from typing_extensions import TypeVar
 
+from pimpmyrice.config_paths import THUMBNAILS_DIR
+
 log = logging.getLogger(__name__)
 
 
@@ -154,10 +156,17 @@ def get_thumbnail(image_path: Path, max_px: int = 512) -> Path:
     """
     from PIL import Image
 
-    thumb_path = image_path.parent / f".{image_path.stem}_{max_px}{image_path.suffix}"
+    thumb_path = (
+        THUMBNAILS_DIR
+        / image_path.parent.name
+        / f".{image_path.stem}_{max_px}{image_path.suffix}"
+    )
 
     if thumb_path.is_file():
         return thumb_path
+
+    if not thumb_path.parent.exists():
+        thumb_path.parent.mkdir()
 
     log.debug(f"generating thumbnail for {image_path}")
 

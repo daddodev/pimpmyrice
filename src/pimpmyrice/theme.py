@@ -10,7 +10,13 @@ from pimpmyrice import parsers, schemas
 from pimpmyrice import theme_utils as tutils
 from pimpmyrice.colors import GlobalPalette, get_palettes
 from pimpmyrice.completions import generate_shell_suggestions
-from pimpmyrice.config_paths import BASE_STYLE_FILE, CONFIG_FILE, STYLES_DIR, THEMES_DIR
+from pimpmyrice.config_paths import (
+    BASE_STYLE_FILE,
+    CONFIG_FILE,
+    STYLES_DIR,
+    THEMES_DIR,
+    THUMBNAILS_DIR,
+)
 from pimpmyrice.files import create_config_dirs, download_file, load_json, save_json
 from pimpmyrice.migrations import migrate_style_dict
 from pimpmyrice.module import ModuleManager
@@ -294,6 +300,11 @@ class ThemeManager:
             theme.name = tutils.valid_theme_name(name=theme.name, themes=self.themes)
             theme_dir = THEMES_DIR / theme.name
             (THEMES_DIR / old_name).rename(theme_dir)
+
+            old_thumb_dir = THUMBNAILS_DIR / old_name
+            if old_thumb_dir.exists():
+                new_thumb_dir = THUMBNAILS_DIR / theme.name
+                old_thumb_dir.rename(new_thumb_dir)
         else:
             theme_dir = THEMES_DIR / theme.name
 

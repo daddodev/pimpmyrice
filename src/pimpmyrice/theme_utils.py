@@ -138,7 +138,7 @@ class Wallpaper(BaseModel):
     path: Path
     mode: WallpaperMode = WallpaperMode.FILL
 
-    @computed_field  # type: ignore
+    @computed_field(repr=False)  # type: ignore
     @property
     def thumb(self) -> Path:
         """
