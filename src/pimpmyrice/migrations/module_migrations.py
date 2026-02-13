@@ -16,8 +16,6 @@ log = logging.getLogger(__name__)
 
 def _has_old_syntax(data: dict[str, Any]) -> bool:
     """Check if module data uses pre-0.5.0 syntax."""
-    if "on_events" in data:
-        return False
     old_keys = {"run", "pre_run", "init", "commands"}
     return bool(old_keys & data.keys())
 
@@ -90,8 +88,18 @@ def migrate_module_dict(data: dict[str, Any]) -> dict[str, Any] | None:
         elif key == "commands":
             migrated["scripts"] = {}
             for script_name, script_value in value.items():
-                script_value["action"] = "python"
-                migrated["scripts"][script_name] = [convert_actions([script_value])[0]]
+                # Handle both single action dict and list of actions
+                if isinstance(script_value, list):
+                    actions = script_value
+                else:
+                    actions = [script_value]
+
+                # Add action="python" to each action that has "function"
+                for action in actions:
+                    if "function" in action and "action" not in action:
+                        action["action"] = "python"
+
+                migrated["scripts"][script_name] = convert_actions(actions)
 
         else:
             migrated[key] = value
