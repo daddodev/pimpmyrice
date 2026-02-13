@@ -454,8 +454,6 @@ class OnEvents(BaseModel):
     theme_applied: list[ModuleLifecycleAction] = []
     themes_changed: list[ModuleLifecycleAction] = []
 
-    model_config = ConfigDict(extra="allow")
-
 
 class Module(BaseModel):
     """Module definition with lifecycle hooks and scripts."""
