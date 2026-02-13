@@ -55,8 +55,16 @@ isort src/pimpmyrice
   - `LinkAction`: Create symlinks
   - `AppendAction`: Append to files
   - `WaitForAction`: Wait for conditions
+- **OnEvents**: Lifecycle hooks for module execution:
+  - `module_install`: Run once when module is installed (LinkAction, AppendAction)
+  - `before_theme_apply`: Pre-processing actions before theme is applied
+  - `theme_apply`: Main theme application actions
+  - `after_theme_apply`: Post-processing actions after theme is applied
+  - `theme_applied`: Actions triggered when any theme is applied
+  - `themes_changed`: Actions triggered when themes list changes
 - **ModuleState**: Tracks action pipeline execution state (PENDING, RUNNING, COMPLETED, FAILED, SKIPPED)
 - Modules are loaded from `module.yaml` or `module.json` files
+- Auto-migration from pre-0.5.0 module format (init/pre_run/run/commands → on_events)
 
 ### Color System (`colors.py`)
 - **Color**: Core class supporting hex, rgb, rgba, hsl, hsv formats with conversion methods
@@ -69,10 +77,13 @@ isort src/pimpmyrice
 - **PIMP_TESTING** env var switches config to `./tests/files` for isolation
 - Key paths:
   - `PIMP_CONFIG_DIR`: `~/.config/pimpmyrice/`
+  - `PIMP_CACHE_DIR`: Platform cache directory
   - `THEMES_DIR`: `themes/` subdirectory
   - `STYLES_DIR`: `styles/` subdirectory
   - `MODULES_DIR`: `modules/` subdirectory
   - `PALETTES_DIR`: `palettes/` subdirectory
+  - `TEMP_DOWNLOADS_DIR`: Cache downloads directory
+  - `THUMBNAILS_DIR`: Thumbnails cache directory
 
 ### Template System (`template.py`)
 - **Jinja2** integration with strict undefined checking
@@ -144,6 +155,15 @@ on_events:
 - `import_image()`: Copy images to theme directories
 - `download_file()`: HTTP downloads with extension detection
 - `create_config_dirs()`: Ensure all config directories exist
+- Auto-migration from old theme format (`$var` → `{{var}}`) when loading
+
+### Migrations (`migrations/`)
+- **theme_migrations.py**: Auto-migrate themes from `$variable` to `{{variable}}` Jinja2 syntax
+- **module_migrations.py**: Auto-migrate modules from old structure to `on_events` structure:
+  - `init` → `on_events.module_install`
+  - `pre_run` → `on_events.before_theme_apply`
+  - `run` → `on_events.theme_apply`
+  - `commands` → `scripts` (actions wrapped in lists)
 
 ### CLI & Args (`cli.py`, `args.py`, `doc.py`)
 - **docopt** for CLI parsing with comprehensive help in `doc.py`
@@ -265,6 +285,10 @@ src/pimpmyrice/
   module_utils.py      # Module models and actions
   colors.py            # Color class, palettes
   palette_generators/  # Algorithmic palette generation
+  migrations/          # Theme/module migration utilities
+    __init__.py        # Migration exports
+    theme_migrations.py  # Theme syntax migration
+    module_migrations.py # Module structure migration
   template.py          # Jinja2 template processing
   files.py             # File I/O utilities
   config_paths.py      # Configuration directory paths
