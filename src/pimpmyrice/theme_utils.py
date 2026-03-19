@@ -418,7 +418,7 @@ def valid_theme_name(name: str, themes: dict[str, Theme]) -> str:
         str: Safe, unique theme name.
     """
     whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
-    char_limit = 20
+    char_limit = 30
     cleaned_filename = (
         unicodedata.normalize("NFKD", name).encode("ASCII", "ignore").decode()
     )
